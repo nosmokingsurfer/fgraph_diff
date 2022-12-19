@@ -1,11 +1,9 @@
-from vis_utils import vis_dataset_element, vec3_to_pose
+from vis_utils import vis_dataset_element
 from multiprocessing import Pool
 from attrdict import AttrDict
-from observation_models import ThetaNav2dFixedCov
 from tqdm import tqdm
 import numpy as np
 import os
-import glob
 import mrob
 from data_utils import leo_dataset_to_toro, load_dataset
 
@@ -13,7 +11,7 @@ from data_utils import leo_dataset_to_toro, load_dataset
 from tqdm import tqdm
 
 from pathlib import Path
-import matplotlib
+
 # matplotlib.use('agg')
 import matplotlib.pyplot as plt
 

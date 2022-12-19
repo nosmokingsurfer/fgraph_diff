@@ -1,16 +1,11 @@
 from pathlib import Path
 
 from data_utils import load_dataset
-from gtsam_solver import gtsam_solve_experiment
-
-from mrob_solver import mrob_solve_experiment
 
 import numpy as np
 
 from tqdm import tqdm
 
-import os
-from tf_utils import wrap_to_pi
 import matplotlib.pyplot as plt
 
 DATASET_PATH = str(Path("./local/datasets/sim/nav2dfix/dataset_0000"))
@@ -29,7 +24,7 @@ if __name__ == "__main__":
     datasets = load_dataset(DATASET_PATH, "train")
 
     for dataset in tqdm(datasets):
-        id, data = dataset
+        id, _ = dataset
 
         mrob_solution = np.genfromtxt(f'./out/{id}_mrob.txt')
         print(mrob_solution)
