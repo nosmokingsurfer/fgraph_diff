@@ -1,4 +1,4 @@
-from vis_utils import vis_dataset_element
+from utils.vis_utils import vis_dataset_element
 from multiprocessing import Pool
 from attrdict import AttrDict
 from tqdm import tqdm
@@ -16,7 +16,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 
-
 def mrob_solve_experiment(id, data):
 
     if not os.path.exists("./out"):
@@ -30,7 +29,7 @@ def mrob_solve_experiment(id, data):
     if not os.path.exists(unrolled_data_path):
 
         unrolled_data = leo_dataset_to_toro(data)
-        with open(unrolled_data_path,'w') as f:
+        with open(unrolled_data_path, 'w') as f:
             f.writelines(unrolled_data)
             f.close()
 
@@ -53,17 +52,20 @@ def mrob_solve_experiment(id, data):
             # read edges and vertex, in TORO format
             if d[0] == 'EDGE2':
                 # EDGE2 id_origin   id_target   dx   dy   dth   I11   I12  I22  I33  I13  I23
-                factors[int(d[1]),int(d[2])] = np.array([d[3], d[4], d[5], d[6],d[7],d[8],d[9],d[10],d[11]],dtype='float64')
+                factors[int(d[1]), int(d[2])] = np.array(
+                    [d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11]], dtype='float64')
                 factors_dictionary[int(d[2])].append(int(d[1]))
             elif d[0] == 'VERTEX2':
                 # VERTEX2 id x y theta
                 # these are the initial guesses for node states
-                vertex_ini[int(d[1])] = np.array([d[2], d[3], d[4]],dtype='float64')
+                vertex_ini[int(d[1])] = np.array(
+                    [d[2], d[3], d[4]], dtype='float64')
                 # create an empty list of pairs of nodes (factor) connected to each node
                 factors_dictionary[int(d[1])] = []
-            
+
             elif d[0] == 'EDGE1':
-                factors[int(d[1]), int(d[1])] = np.array([d[2],d[3], d[4], d[5], d[6],d[7],d[8],d[9],d[10]], dtype='float64')
+                factors[int(d[1]), int(d[1])] = np.array(
+                    [d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10]], dtype='float64')
                 factors_dictionary[int(d[1])].append(int(d[1]))
 
    # Initialize FG for solution
@@ -83,25 +85,24 @@ def mrob_solve_experiment(id, data):
         for nodeOrigin in factors_dictionary[n]:
             # inputs: obs, idOrigin, idTarget, invCov
             obs = factors[nodeOrigin, t][:3]
-            covInv = np.zeros((3,3))
+            covInv = np.zeros((3, 3))
             # on M3500 always diagonal information matrices
-            covInv[0,0] = factors[nodeOrigin, t][3]
-            covInv[1,1] = factors[nodeOrigin, t][5]
-            covInv[2,2] = factors[nodeOrigin, t][6]
+            covInv[0, 0] = factors[nodeOrigin, t][3]
+            covInv[1, 1] = factors[nodeOrigin, t][5]
+            covInv[2, 2] = factors[nodeOrigin, t][6]
 
             covInv = np.linalg.inv(covInv)
 
             if nodeOrigin != n:
-                graph.add_factor_2poses_2d_odom(obs, nodeOrigin,t,covInv)
+                graph.add_factor_2poses_2d_odom(obs, nodeOrigin, t, covInv)
 
             elif nodeOrigin == n:
                 graph.add_factor_1pose_2d(obs, nodeOrigin, covInv)
-    
+
     # print('current initial chi2 = ', graph.chi2() )
     graph.solve(mrob.LM, 50)
     print('solution drawn')
     # graph.print(True)
-
 
     solution = graph.get_estimated_state()
     solution = np.array(solution).squeeze()
@@ -121,26 +122,24 @@ def main():
 
         mrob_solution = mrob_solve_experiment(experiment_id, data)
 
-        np.savetxt(f"./out/{experiment_id}_mrob.txt",mrob_solution)
+        np.savetxt(f"./out/{experiment_id}_mrob.txt", mrob_solution)
 
         fig, ax = plt.subplots(2, 1, figsize=(10, 10))
         vis_dataset_element(data, ax[0])
-        ax[0].plot(mrob_solution[:, 0], mrob_solution[:, 1], label='mrob trajectory')
+        ax[0].plot(mrob_solution[:, 0], mrob_solution[:, 1],
+                   label='mrob trajectory')
         ax[0].legend()
         ax[0].grid()
 
-        ax[1].plot(mrob_solution[:,2], label='mrob orientation')
+        ax[1].plot(mrob_solution[:, 2], label='mrob orientation')
         ax[1].legend()
         ax[1].grid()
         fig.suptitle(experiment_id)
         # plt.show()
 
-
         plt.savefig("./out/" + experiment_id + "_mrob.jpg")
 
         plt.close('all')
-
-
 
 
 if __name__ == '__main__':

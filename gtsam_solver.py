@@ -7,7 +7,7 @@ from pathlib import Path
 
 from data_utils import load_dataset
 import os
-import tf_utils
+from utils import tf_utils
 from tqdm import tqdm
 
 import matplotlib.pyplot as plt
@@ -204,8 +204,4 @@ if __name__ == "__main__":
         plt.savefig("./out/" + experiment_id + "_gtsam.jpg")
 
         plt.close('all')
-
-
-        
-            
             
