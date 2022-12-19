@@ -7,9 +7,10 @@ import numpy as np
 import os
 import glob
 import mrob
-from utils import dir_utils
-from data_utils import leo_dataset_to_toro
+from data_utils import leo_dataset_to_toro, load_dataset
 
+# import networkx as nx
+from tqdm import tqdm
 
 from pathlib import Path
 import matplotlib
@@ -17,52 +18,27 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 
-DATASET_PATH = str(Path("../leo/local/datasets/sim/nav2dfix/dataset_0000"))
 
-
-
-def load_dataset(dataset_path, dataset_mode="train"):
-
-    files = glob.glob(f"{dataset_path}/{dataset_mode}/*.json")
-    files.sort()
-
-    datasets = []
-    for f in files:
-        print(f"Loading data from {f}")
-
-        tmp = dir_utils.read_file_json(f, verbose=False)
-        key = f"{Path(f).parts[-3]}_{Path(f).parts[-2]}_{Path(f).stem}"
-
-        datasets.append((key, tmp))
-
-    return datasets
-
-# def process_experiment_gtsam(dataset, L=0):
-#     id, experiment = dataset
-#     experiment = AttrDict(experiment)
-#     graph = gt
-
-def process_experiment_mrob(dataset, L=0):
+def mrob_solve_experiment(id, data):
 
     if not os.path.exists("./out"):
         os.makedirs("./out", exist_ok=True)
 
-    id, experiment = dataset
-    experiment = AttrDict(experiment)
-    print(id)
+    data = AttrDict(data)
+    # print(id)
 
     # checking if cached unrolled data already exists
     unrolled_data_path = f"./out/{id}_unrolled_data.txt"
     if not os.path.exists(unrolled_data_path):
 
-        unrolled_data = leo_dataset_to_toro(experiment)
+        unrolled_data = leo_dataset_to_toro(data)
         with open(unrolled_data_path,'w') as f:
             f.writelines(unrolled_data)
             f.close()
 
     # number of iterations for current experiment
-    n_steps = len(experiment.poses_gt)
-    # n_steps = 10
+    n_steps = len(data.poses_gt)
+    # n_steps = 300
 
     # Initialize data structures
     vertex_ini = {}
@@ -92,25 +68,20 @@ def process_experiment_mrob(dataset, L=0):
                 factors[int(d[1]), int(d[1])] = np.array([d[2],d[3], d[4], d[5], d[6],d[7],d[8],d[9],d[10]], dtype='float64')
                 factors_dictionary[int(d[1])].append(int(d[1]))
 
-    graph_matrix = np.zeros((n_steps,n_steps))
-
-   # Initialize FG
+   # Initialize FG for solution
     graph = mrob.FGraph()
     x = np.zeros(3)
     n = graph.add_node_pose_2d(x)
-    print('node 0 id = ', n) # id starts at 1
-    processing_time = []
+    # print('node 0 id = ', n) # id starts at 1
 
     # start events, we solve for each node, adding it and it corresponding factors
     # in total takes 0.3s to read all datastructure
-    for t in range(1,n_steps):
+    for t in range(1, n_steps):
         x = vertex_ini[t]
         n = graph.add_node_pose_2d(x)
         assert t == n, 'index on node is different from counter'
 
         # find factors to add. there must be 1 odom and other observations
-        connecting_nodes = factors_dictionary[n]
-
         for nodeOrigin in factors_dictionary[n]:
             # inputs: obs, idOrigin, idTarget, invCov
             obs = factors[nodeOrigin, t][:3]
@@ -120,56 +91,58 @@ def process_experiment_mrob(dataset, L=0):
             covInv[1,1] = factors[nodeOrigin, t][5]
             covInv[2,2] = factors[nodeOrigin, t][6]
 
+            covInv = np.linalg.inv(covInv)
+
             if nodeOrigin != n:
                 graph.add_factor_2poses_2d_odom(obs, nodeOrigin,t,covInv)
-            elif nodeOrigin == n:
-                graph.add_factor_1pose_2d(obs, nodeOrigin,covInv)
-            # for end. no more loop inside the factors
-    
 
-    print('current initial chi2 = ', graph.chi2() )
+            elif nodeOrigin == n:
+                graph.add_factor_1pose_2d(obs, nodeOrigin, covInv)
+    
+    # print('current initial chi2 = ', graph.chi2() )
     graph.solve(mrob.LM, 50)
     print('solution drawn')
     # graph.print(True)
 
-    import networkx as nx
 
-    G = nx.from_numpy_matrix(graph_matrix)
-    nx.draw(G)
+    solution = graph.get_estimated_state()
+    solution = np.array(solution).squeeze()
 
-    res = graph.get_estimated_state()
-    res = np.array(res).squeeze()
-
-    fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-    vis_dataset_element(dataset, ax)
-    ax.plot(res[:, 0], res[:, 1], label='estimated trajectory')
-    # meas = np.array(gnss_measurements).squeeze()
-
-    # ax.plot(meas[:, 0], meas[:, 1], label='measured')
-    ax.legend()
-    # plt.show()
-
-
-    plt.savefig("./out/" + Path(dataset[0]).stem + ".jpg")
-
-    plt.close('all')
-
-    pass
+    return solution
 
 
 def main():
 
+    DATASET_PATH = str(Path("../leo/local/datasets/sim/nav2dfix/dataset_0000"))
+
     # reading the datasets
     datasets = load_dataset(DATASET_PATH, 'train')
 
-    # process_experiment(datasets[0])
+    for i in tqdm(range(len(datasets))):
+        experiment_id, data = datasets[i][0], datasets[i][1]
 
-    with Pool(8) as p:
-        res = [p.apply_async(process_experiment_mrob, args=([dataset,i]))
-               for i, dataset in enumerate(datasets)]
+        mrob_solution = mrob_solve_experiment(experiment_id, data)
 
-        for r in res:
-            r.get()
+        np.savetxt(f"./out/{experiment_id}_mrob.txt",mrob_solution)
+
+        fig, ax = plt.subplots(2, 1, figsize=(10, 10))
+        vis_dataset_element(data, ax[0])
+        ax[0].plot(mrob_solution[:, 0], mrob_solution[:, 1], label='mrob trajectory')
+        ax[0].legend()
+        ax[0].grid()
+
+        ax[1].plot(mrob_solution[:,2], label='mrob orientation')
+        ax[1].legend()
+        ax[1].grid()
+        fig.suptitle(experiment_id)
+        # plt.show()
+
+
+        plt.savefig("./out/" + experiment_id + "_mrob.jpg")
+
+        plt.close('all')
+
+
 
 
 if __name__ == '__main__':

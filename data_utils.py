@@ -1,5 +1,9 @@
 import numpy as np
+import glob
 
+from pathlib import Path
+
+from utils import dir_utils
 
 # http://www2.informatik.uni-freiburg.de/~stachnis/toro/
 # Logfile Format
@@ -33,7 +37,7 @@ def leo_dataset_to_toro(data):
     for i in range(len(gt_poses)):
         result += f"VERTEX2 {i} {gt_poses[i][0]} {gt_poses[i][1]} {gt_poses[i][2]}\n"
 
-    print(result)
+    # print(result)
 
     # factor for GNSS
     # EDGE1 id_target x y theta I11   I12  I22  I33  I13  I23
@@ -66,3 +70,19 @@ def leo_dataset_to_toro(data):
 
 
     return result
+
+def load_dataset(dataset_path, dataset_mode="train"):
+
+    files = glob.glob(f"{dataset_path}/{dataset_mode}/*.json")
+    files.sort()
+
+    datasets = []
+    for f in files:
+        print(f"Loading data from {f}")
+
+        tmp = dir_utils.read_file_json(f, verbose=False)
+        key = f"{Path(f).parts[-3]}_{Path(f).parts[-2]}_{Path(f).stem}"
+
+        datasets.append((key, tmp))
+
+    return datasets

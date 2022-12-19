@@ -32,11 +32,11 @@ def vis_pose(pose, ax):
              axis_length*np.cos(angles[2]), color='green')
 
 
-def vis_dataset_element(experiment,ax):
+def vis_dataset_element(data,ax):
     """
     visualize trajectory defined by (x,y,theta) time series
     """
-    traj = np.array(experiment[1]['poses_gt'])
+    traj = np.array(data['poses_gt'])
     # fig, ax = plt.subplots(1, 1)
     poses = []
     for i in range(len(traj)):
@@ -49,7 +49,5 @@ def vis_dataset_element(experiment,ax):
 
     ax.grid()
     ax.axis('equal')
-    ax.set_title(experiment[0])
-    
 
     return poses
