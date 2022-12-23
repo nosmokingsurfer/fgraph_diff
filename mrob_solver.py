@@ -87,9 +87,9 @@ def mrob_solve_experiment(id, data):
             obs = factors[nodeOrigin, t][:3]
             covInv = np.zeros((3, 3))
             # on M3500 always diagonal information matrices
-            covInv[0, 0] = factors[nodeOrigin, t][3]
-            covInv[1, 1] = factors[nodeOrigin, t][5]
-            covInv[2, 2] = factors[nodeOrigin, t][6]
+            covInv[0, 0] = 1.0 #factors[nodeOrigin, t][3]
+            covInv[1, 1] = 1.0 #factors[nodeOrigin, t][5]
+            covInv[2, 2] = 1.0 #factors[nodeOrigin, t][6]
 
             covInv = np.linalg.inv(covInv)
 

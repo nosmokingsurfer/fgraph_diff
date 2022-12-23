@@ -18,6 +18,8 @@ def error_translational(traj1, traj2):
 
     return error
 
+import gtsam
+
 
 
 if __name__ == "__main__":
@@ -41,10 +43,10 @@ if __name__ == "__main__":
         plt.grid()
         plt.axis('equal')
         plt.legend()
-        # plt.show()
+        plt.show()
 
-        plt.savefig("./out/" + id + "_gtsam_vs_mrob.jpg")
-        plt.close('all')
+        # plt.savefig("./out/" + id + "_gtsam_vs_mrob.jpg")
+        # plt.close('all')
 
 
 

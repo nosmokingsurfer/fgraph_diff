@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 
+
 class GTSAM_graph():
     def __init__(self):
         # initizalizing the optimzator
@@ -20,10 +21,9 @@ class GTSAM_graph():
         self.init_vals = gtsam.Values()
         self.est_vals = gtsam.Values()
 
+        self.sigma_inv_odom = np.array([1., 1., 1.])
 
-        self.sigma_inv_odom = np.array([10., 10., 10.])
-
-        self.sigma_inv_gps = np.array([10., 10., 10.])
+        self.sigma_inv_gps = np.array([1., 1., 1.])
 
     def get_sigma_inv(self, factor_name):
         sigma_inv_val = getattr(self, "sigma_inv_{0}".format(factor_name))
