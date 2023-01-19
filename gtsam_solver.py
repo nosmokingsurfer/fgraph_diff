@@ -64,8 +64,8 @@ class GTSAM_graph():
         self.add_unary_factor(keys, prior_cov, data['poses_gt'][0])
     
 
-        self.optimizer_update()
-        self.reset_graph()
+        # self.optimizer_update()
+        # self.reset_graph()
 
     def init_isam2(self):
         params_isam2 = gtsam.ISAM2Params()
@@ -155,22 +155,33 @@ def gtsam_solve_experiment(data):
             factor_cov = np.reciprocal(np.sqrt(sigma_inv_val))
 
             if (factor_name == 'gps'):
-                solver_gtsam.graph = tf_utils.add_unary_factor(
-                    solver_gtsam.graph, keys, factor_cov, factor_meas[idx][0:3])
+                factor_noise_model = tf_utils.get_noise_model(factor_cov)
+                factor_meas_pose_gps = tf_utils.vec3_to_pose2(factor_meas[idx][:3])
+                factor = gtsam.PriorFactorPose2(keys[0], factor_meas_pose_gps, factor_noise_model)
+                solver_gtsam.graph.push_back(factor)
+
+                # solver_gtsam.graph = tf_utils.add_unary_factor(solver_gtsam.graph, keys, factor_cov, factor_meas[idx][0:3])
             elif (factor_name == 'odom'):
-                solver_gtsam.graph = tf_utils.add_binary_odom_factor(
-                    solver_gtsam.graph, keys, factor_cov, factor_meas[idx][0:3])
+                factor_noise_model = tf_utils.get_noise_model(factor_cov)
+                factor_meas_pose = tf_utils.vec3_to_pose2(factor_meas[idx][:3])
+                factor = gtsam.BetweenFactorPose2(keys[0], keys[1], factor_meas_pose, factor_noise_model)
+                solver_gtsam.graph.push_back(factor)
+                # solver_gtsam.graph = tf_utils.add_binary_odom_factor(solver_gtsam.graph, keys, factor_cov, factor_meas[idx][0:3])
 
 
-        solver_gtsam.init_vars_step(tstep)
+        # solver_gtsam.init_vars_step(tstep)
+
+        key_tm1 = gtsam.symbol(ord('x'), tstep-1)
+        key_t = gtsam.symbol(ord('x'), tstep)
+        solver_gtsam.init_vals.insert(key_t, solver_gtsam.init_vals.atPose2(key_tm1))
 
         # optimize
-        solver_gtsam.optimizer_update()
+    solver_gtsam.optimizer_update()
 
         # print(solver_gtsam.est_vals)
 
         # reset graph
-        solver_gtsam.reset_graph()
+        # solver_gtsam.reset_graph()
 
     gtsam_solution = get_optimizer_soln(nsteps, solver_gtsam)
 

@@ -18,9 +18,6 @@ def error_translational(traj1, traj2):
 
     return error
 
-import gtsam
-
-
 
 if __name__ == "__main__":
     datasets = load_dataset(DATASET_PATH, "train")
