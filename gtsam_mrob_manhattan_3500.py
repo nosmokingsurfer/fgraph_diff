@@ -25,10 +25,15 @@ leo_dataset_file = f"./benchmarks/M3500.txt"
 # initial - initial state of the system
 [graph, initial] = gtsam.load2D(leo_dataset_file)
 
+gtsam_chi2_initial = graph.error(initial)
+
 # do graph optimization
 
 start = time.time()
 gtsam_optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial)
+
+
+
 result = gtsam_optimizer.optimize()
 gtsam_iterations = gtsam_optimizer.iterations()
 end = time.time()
@@ -38,7 +43,7 @@ gtsam_time = 1e0*(end - start)
 # calculating chi2 according the following code in gtsam repo
 # https://github.com/devbharat/gtsam/blob/5f15d264ed639cb0add335e2b089086141127fff/examples/SolverComparer.cpp#L92
 dof = graph.size() - result.size()
-gtsam_chi2 = 2*graph.error(result)/dof
+gtsam_chi2_final = graph.error(result)
 
 # saving poses and plotting trajectory for the gtsam
 poses = np.array([result.atPose2(key) for key in range(0, result.size())])
@@ -58,12 +63,14 @@ np.savetxt(f"./out/M3500_gtsam.txt", gtsam_solution)
 # initializing mrob graph from TORO file M3500.txt
 graph = toro_to_mrob(leo_dataset_file)
 
-# print(f'initial chi2 = {graph.chi2()}')
+mrob_chi2_initial = graph.chi2()
 
 start = time.time()
 mrob_iterations = graph.solve(mrob.LM, 50)
 end = time.time()
 mrob_time = 1e0*(end - start)
+
+mrob_chi2_final = graph.chi2()
 
 mrob_solution = graph.get_estimated_state()
 mrob_solution = np.array(mrob_solution).squeeze()
@@ -72,12 +79,18 @@ np.savetxt(f"./out/M3500_mrob.txt", mrob_solution)
 
 # plotting obtained solutions for MROB and GTSAM
 print("-"*80)
-print(f"gtsam_chi2 = {gtsam_chi2}")
+print(f"gtsam_chi2_initial = {gtsam_chi2_initial}")
+print(f'gtsam_chi2 final = {gtsam_chi2_final}')
 print(f'gtsam total time[ms] = {gtsam_time*1e+3}')
 print(f'gtsam # iterations = {gtsam_iterations}')
 print(f'gtsam [ms]/iteration = {gtsam_time*1e+3/gtsam_iterations}')
+print("-"*80)
+# print(f'mrob_chi2 initial = {mrob_chi2_initial/dof}')  <---- sketchy code
+print(f'mrob_chi2 initial = {mrob_chi2_initial}')
 
-print(f'mrob_chi2 = {graph.chi2()}')
+# print(f'mrob_chi2 final = {mrob_chi2_final/dof}')  <---- sketchy code
+print(f'mrob_chi2 final = {mrob_chi2_final}')
+
 print(f'mrob total time[ms] = {mrob_time*1e+3}')
 print(f'mrob # iterations = {mrob_iterations}')
 print(f'mrob [ms]/iteration = {mrob_time*1e+3/mrob_iterations}')
