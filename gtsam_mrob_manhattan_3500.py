@@ -28,7 +28,9 @@ leo_dataset_file = f"./benchmarks/M3500.txt"
 # do graph optimization
 
 start = time.time()
-result = gtsam.LevenbergMarquardtOptimizer(graph, initial).optimize()
+gtsam_optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial)
+result = gtsam_optimizer.optimize()
+gtsam_iterations = gtsam_optimizer.iterations()
 end = time.time()
 gtsam_time = 1e0*(end - start)
 
@@ -59,7 +61,7 @@ graph = toro_to_mrob(leo_dataset_file)
 # print(f'initial chi2 = {graph.chi2()}')
 
 start = time.time()
-graph.solve(mrob.LM, 50)
+mrob_iterations = graph.solve(mrob.LM, 50)
 end = time.time()
 mrob_time = 1e0*(end - start)
 
@@ -71,9 +73,14 @@ np.savetxt(f"./out/M3500_mrob.txt", mrob_solution)
 # plotting obtained solutions for MROB and GTSAM
 print("-"*80)
 print(f"gtsam_chi2 = {gtsam_chi2}")
+print(f'gtsam total time[ms] = {gtsam_time*1e+3}')
+print(f'gtsam # iterations = {gtsam_iterations}')
+print(f'gtsam [ms]/iteration = {gtsam_time*1e+3/gtsam_iterations}')
+
 print(f'mrob_chi2 = {graph.chi2()}')
-print(f'gtsam time[ms] = {gtsam_time*1e+3}')
-print(f'mrob time[ms] = {mrob_time*1e+3}')
+print(f'mrob total time[ms] = {mrob_time*1e+3}')
+print(f'mrob # iterations = {mrob_iterations}')
+print(f'mrob [ms]/iteration = {mrob_time*1e+3/mrob_iterations}')
 
 trans_error = error_translational(mrob_solution, gtsam_solution)
 
