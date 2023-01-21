@@ -85,11 +85,11 @@ print(f'gtsam total time[ms] = {gtsam_time*1e+3}')
 print(f'gtsam # iterations = {gtsam_iterations}')
 print(f'gtsam [ms]/iteration = {gtsam_time*1e+3/gtsam_iterations}')
 print("-"*80)
-# print(f'mrob_chi2 initial = {mrob_chi2_initial/dof}')  <---- sketchy code
-print(f'mrob_chi2 initial = {mrob_chi2_initial}')
+print(f'mrob_chi2 initial = {mrob_chi2_initial/dof}')#  <---- sketchy code
+# print(f'mrob_chi2 initial = {mrob_chi2_initial}')
 
-# print(f'mrob_chi2 final = {mrob_chi2_final/dof}')  <---- sketchy code
-print(f'mrob_chi2 final = {mrob_chi2_final}')
+print(f'mrob_chi2 final = {mrob_chi2_final/dof}') # <---- sketchy code
+# print(f'mrob_chi2 final = {mrob_chi2_final}')
 
 print(f'mrob total time[ms] = {mrob_time*1e+3}')
 print(f'mrob # iterations = {mrob_iterations}')
@@ -108,7 +108,7 @@ ax[1].plot(np.unwrap(gtsam_solution[:, 2]), label='theta angle from gtsam')
 ax[1].plot(np.unwrap(gtsam_solution[:,2]), label='theta angle from mrob')
 ax[1].legend()
 ax[1].grid()
-fig.suptitle(f"GTSAM vs MROB \nerror = {trans_error.mean()}")
+fig.suptitle(f"GTSAM vs MROB \n translational error = {trans_error.mean()}")
 plt.show()
 
 
