@@ -11,6 +11,7 @@ from utils import tf_utils
 from tqdm import tqdm
 
 import matplotlib.pyplot as plt
+from utils.vis_utils import vis_dataset_element
 
 
 class GTSAM_graph():
@@ -21,9 +22,9 @@ class GTSAM_graph():
         self.init_vals = gtsam.Values()
         self.est_vals = gtsam.Values()
 
-        self.sigma_inv_odom = np.array([1., 1., 1.])
+        self.sigma_inv_odom = np.array([0.1, 0.1, 0.1])
 
-        self.sigma_inv_gps = np.array([1., 1., 1.])
+        self.sigma_inv_gps = np.array([1., 1., 0.1])
 
     def get_sigma_inv(self, factor_name):
         sigma_inv_val = getattr(self, "sigma_inv_{0}".format(factor_name))
@@ -175,6 +176,9 @@ def gtsam_solve_experiment(data):
         key_t = gtsam.symbol(ord('x'), tstep)
         solver_gtsam.init_vals.insert(key_t, solver_gtsam.init_vals.atPose2(key_tm1))
 
+
+    # gtsam.save2D(solver_gtsam.graph,solver_gtsam.init_vals,  gtsam.noiseModel_Diagonal.Sigmas(np.array([0,0,0])), './gtasm_test_output.txt')
+
         # optimize
     solver_gtsam.optimizer_update()
 
@@ -205,14 +209,21 @@ if __name__ == "__main__":
 
         np.savetxt(f"./out/{experiment_id}_gtsam.txt",gtsam_solution)
 
-        plt.plot(gtsam_solution[:,0], gtsam_solution[:,1], label=f"gtsam (isam2) solution")
-        plt.grid()
-        plt.axis('equal')
-        plt.legend()
-        plt.title(experiment_id)
-        # plt.show()
+        fig, ax = plt.subplots(2, 1, figsize=(10, 10))
+        vis_dataset_element(data, ax[0])
+        ax[0].plot(gtsam_solution[:, 0], gtsam_solution[:, 1],
+                   label='gtsam(isam2) trajectory')
+        ax[0].legend()
+        # ax[0].grid()
+        ax[0].axis('equal')
+
+        ax[1].plot(np.unwrap(gtsam_solution[:, 2],discont=np.pi/4), label='gtsam orientation')
+        ax[1].legend()
+        ax[1].grid()
+        fig.suptitle(experiment_id)
 
         plt.savefig("./out/" + experiment_id + "_gtsam.jpg")
+        # plt.show()
 
         plt.close('all')
             

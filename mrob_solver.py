@@ -187,11 +187,11 @@ def main():
         np.savetxt(f"./out/{experiment_id}_mrob.txt", mrob_solution)
 
         fig, ax = plt.subplots(2, 1, figsize=(10, 10))
-        # vis_dataset_element(data, ax[0])
+        vis_dataset_element(data, ax[0])
         ax[0].plot(mrob_solution[:, 0], mrob_solution[:, 1],
                    label='mrob trajectory')
         ax[0].legend()
-        ax[0].grid()
+        # ax[0].grid()
         ax[0].axis('equal')
 
         ax[1].plot(np.unwrap(mrob_solution[:, 2]), label='mrob orientation')
