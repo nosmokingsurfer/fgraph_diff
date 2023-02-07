@@ -3,6 +3,8 @@ sys.path.insert(0,"/usr/local/cython/")
 import gtsam
 import numpy as np
 
+
+import gtsam.utils.plot as gtsam_plot
 from pathlib import Path
 
 from data_utils import load_dataset
@@ -177,7 +179,8 @@ def gtsam_solve_experiment(data):
         solver_gtsam.init_vals.insert(key_t, solver_gtsam.init_vals.atPose2(key_tm1))
 
 
-    # gtsam.save2D(solver_gtsam.graph,solver_gtsam.init_vals,  gtsam.noiseModel_Diagonal.Sigmas(np.array([0,0,0])), './gtasm_test_output.txt')
+
+    result = gtsam.LevenbergMarquardtOptimizer(solver_gtsam.graph, solver_gtsam.init_vals).optimize()
 
         # optimize
     solver_gtsam.optimizer_update()
@@ -188,6 +191,19 @@ def gtsam_solve_experiment(data):
         # solver_gtsam.reset_graph()
 
     gtsam_solution = get_optimizer_soln(nsteps, solver_gtsam)
+    # poses_graph = solver_gtsam.optimizer.calculateEstimate()
+    # num_poses = poses_graph.size()
+    # keys = [[gtsam.symbol(ord('x'), i)] for i in range(0, num_poses)]
+
+    # marginals = gtsam.Marginals(solver_gtsam.graph,result)
+
+    # for key in keys: 
+    #     gtsam_plot.plot_pose2(0,poses_graph.atPose2(key[0]), 0.5, marginals.marginalCovariance(key[0]))
+    
+    # plt.grid()
+    # plt.axis('equal')
+    # plt.show()
+
 
     return gtsam_solution
 
