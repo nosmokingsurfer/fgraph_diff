@@ -47,9 +47,6 @@ def vis_dataset_element(data,ax):
 
     ax.plot(traj[:, 0], traj[:, 1], linestyle='--',label='gt trajectory')
 
-    ax.grid()
-    ax.axis('equal')
-
     return poses
 
 
