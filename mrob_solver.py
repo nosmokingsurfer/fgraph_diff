@@ -53,7 +53,7 @@ def toro_to_mrob(toro_file, i, j, delta):
 
     N = len(vertex_ini)
 
-    for t in range(1, 100):
+    for t in range(1, N):
         x = vertex_ini[t]
         # print(x)
         n = graph.add_node_pose_2d(x)
@@ -235,24 +235,27 @@ def compute_gradient():
     # considering only first experiment
     experiment_id, data = datasets[0][0], datasets[0][1]
 
+    # differentiating first 10 odometry factors
+    # thus the result will be in 10x3 array
+    delta = 1e-2
+
+    K = 300 # how many factors will be differentiated
+
+    num_gradient = np.zeros((K,3))
+
     # calculating error value in the starting point
 
     mrob_solution = mrob_solve_experiment(experiment_id, data, 0, 0, 0)
 
     np.savetxt(f"./out/{experiment_id}_mrob_{0}_{0}.txt", mrob_solution)
 
-    gt_poses = np.array(data['poses_gt'])[:100]
+
+    gt_poses = np.array(data['poses_gt'])[:num_gradient.shape[0]]
     gt_traj = gt_poses[:,:2]
-    pred_traj = mrob_solution[:,:2]
+    pred_traj = mrob_solution[:num_gradient.shape[0],:2]
 
     error_0 = error_translational(gt_traj, pred_traj)
 
-
-    # differentiating first 10 odometry factors
-    # thus the result will be in 10x3 array
-    delta = 1e-2
-
-    num_gradient = np.zeros((100,3))
 
     for i in tqdm(range(num_gradient.shape[0])):
         for j in range(num_gradient.shape[1]):
@@ -270,9 +273,9 @@ def compute_gradient():
             fig, ax = plt.subplots(2, 1, figsize=(10, 10))
             vis_dataset_element(data, ax[0])
 
-            gt_poses = np.array(data['poses_gt'])[:100]
+            gt_poses = np.array(data['poses_gt'])[:num_gradient.shape[0]]
             gt_traj = gt_poses[:,:2]
-            pred_traj = mrob_solution[:,:2]
+            pred_traj = mrob_solution[:num_gradient.shape[0],:2]
 
             error = error_translational(gt_traj, pred_traj)
             np.savetxt(error_name, error)
@@ -294,6 +297,7 @@ def compute_gradient():
             plt.close('all')
 
     sns.heatmap(num_gradient, annot=True,  fmt=".3f")
+    plt.title(f"Gradient of translational error with reference to odometry covariance elements.\n First {K} odometry factors were used.\n delta = {delta}")
     plt.xlabel("Covariance i-th coordinate")
     plt.ylabel("Odometry factor #")
     plt.show()
