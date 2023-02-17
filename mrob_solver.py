@@ -9,6 +9,7 @@ from data_utils import leo_dataset_to_toro, load_dataset
 
 # import networkx as nx
 from tqdm import tqdm
+import time
 
 from pathlib import Path
 
@@ -247,7 +248,7 @@ def compute_gradient():
 
     mrob_solution = mrob_solve_experiment(experiment_id, data, 0, 0, 0)
 
-    np.savetxt(f"./out/{experiment_id}_mrob_{0}_{0}.txt", mrob_solution)
+    np.savetxt(f"./out/{experiment_id}_mrob_error_origin.txt", mrob_solution)
 
 
     gt_poses = np.array(data['poses_gt'])[:num_gradient.shape[0]]
@@ -256,7 +257,7 @@ def compute_gradient():
 
     error_0 = error_translational(gt_traj, pred_traj)
 
-
+    start = time.time()
     for i in tqdm(range(num_gradient.shape[0])):
         for j in range(num_gradient.shape[1]):
             
@@ -295,11 +296,14 @@ def compute_gradient():
             # plt.show()
 
             plt.close('all')
-
-    sns.heatmap(num_gradient, annot=True,  fmt=".3f")
+    end = time.time()
+    print("total time [ms] ", 1e3*(end - start))
+    sns.heatmap(num_gradient, annot=False,  fmt=".3f")
     plt.title(f"Gradient of translational error with reference to odometry covariance elements.\n First {K} odometry factors were used.\n delta = {delta}")
     plt.xlabel("Covariance i-th coordinate")
     plt.ylabel("Odometry factor #")
+
+    plt.savefig('./out/{experiment_id}_odometry_factors_gradient.png')
     plt.show()
 
 if __name__ == '__main__':
