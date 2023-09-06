@@ -17,7 +17,7 @@ torch.manual_seed(0)
 path_length = 50
 state_size = 2
 batch_size = 4
-learning_method = "leo"  # "default", "leo"
+learning_method = "default"  # "default", "leo"
 
 vis_flag = True
 plt.ion()
@@ -368,21 +368,21 @@ def run_learning(mode_, path_data_, gps_targets_, measurements_):
 
     return best_solution, losses
 
+if __name__ == "__main__":
+    path_data = generate_path_data(batch_size, 50)
+    gps_targets = []
+    measurements = []
+    for i in range(path_length):
+        gps_noise = 0.075 * path_data[i][1].abs() * torch.randn(batch_size, 2)
+        gps_target = (path_data[i] + gps_noise).view(batch_size, 2)
+        gps_targets.append(gps_target)
 
-path_data = generate_path_data(batch_size, 50)
-gps_targets = []
-measurements = []
-for i in range(path_length):
-    gps_noise = 0.075 * path_data[i][1].abs() * torch.randn(batch_size, 2)
-    gps_target = (path_data[i] + gps_noise).view(batch_size, 2)
-    gps_targets.append(gps_target)
+        if i < path_length - 1:
+            measurement = (path_data[i + 1] - path_data[i]).view(batch_size, 2)
+            measurement_noise = 0.005 * torch.randn(batch_size, 2).view(batch_size, 2)
+            measurements.append(measurement + measurement_noise)
 
-    if i < path_length - 1:
-        measurement = (path_data[i + 1] - path_data[i]).view(batch_size, 2)
-        measurement_noise = 0.005 * torch.randn(batch_size, 2).view(batch_size, 2)
-        measurements.append(measurement + measurement_noise)
-
-constant_solution, constant_losses = run_learning(
-    "not constant",
-      path_data, gps_targets, measurements
-)
+    constant_solution, constant_losses = run_learning(
+        "not constant",
+        path_data, gps_targets, measurements
+    )
