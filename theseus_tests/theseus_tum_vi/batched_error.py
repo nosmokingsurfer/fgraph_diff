@@ -32,7 +32,6 @@ gt_traj = torch.cumsum(gt_vel, dim=-1)
 
 model = SimpleNN(1, 1, hid_size=30)
 model.train()
-model
 
 poses : List[th.SE2] = []
 for i in range(N):
@@ -60,7 +59,7 @@ for cost in cost_functions:
 optimizer = th.GaussNewton(
         objective,
         th.CholeskyDenseSolver,
-        max_iterations=10,
+        max_iterations=5,
         step_size=0.1,
     )
 
@@ -77,11 +76,11 @@ for epoch in tqdm(range(20)):
     for i in range(N-1):
         tmp = torch.zeros(B,4)
         tmp[:,2] =  1.0
-        tmp[:,0] = 0.5*predicted_acc[:,i]**2 + predicted_acc[:,i]
+        tmp[:,0] = 0.5*torch.pow(predicted_acc[:,i],2) + predicted_acc[:,i]
         theseus_inputs[f"predicted_odometry_{i}"] = tmp
 
-    objective.update(theseus_inputs)
-    print(f"Objective error = {objective.error_metric().mean().item()}")
+    # objective.update(theseus_inputs)
+    # print(f"Objective error = {objective.error_metric().mean().item()}")
 
     theseus_output, _ = state_estimator.forward(
             theseus_inputs,
@@ -100,7 +99,7 @@ for epoch in tqdm(range(20)):
 
     loss.backward()
 
-    model_optimizer.step()
+    # model_optimizer.step()
 
     losses.append(loss.item())
 
