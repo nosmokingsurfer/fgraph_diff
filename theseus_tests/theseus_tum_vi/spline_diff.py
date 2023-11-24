@@ -62,7 +62,7 @@ def generate_imu_data(data):
     gyro_measurments = np.zeros(len(tau)-1)
 
     for i in range(len(gyro_measurments)-1):
-        gyro_measurments[i] = np.arccos(np.dot(tau[i],tau[i+1]))/dt
+        gyro_measurments[i] = np.arcsin(np.cross(tau[i],tau[i+1]))/dt
 
     # plt.figure()
     # plt.plot(gyro_measurments)
@@ -98,3 +98,11 @@ if __name__ == "__main__":
 
     plt.show()
 
+
+    track = {
+        'gt' : data,
+        'acc' : acc_measurments,
+        'gyro' : gyro_measurments
+        }
+    
+    print(track)

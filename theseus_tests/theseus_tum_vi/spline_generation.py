@@ -136,7 +136,7 @@ def on_click(event):
     control[0].set_data(control_points.transpose())
 
     global spline_points
-    spline_points = bspline(control_points, 100*len(control_points), 3)
+    spline_points = bspline(control_points, 100*len(control_points), 4)
     spline[0].set_data(spline_points[:,0], spline_points[:,1])
 
     plt.show()
