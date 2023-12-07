@@ -1,62 +1,10 @@
-# import math
-
-# import matplotlib.pyplot as plt
-# import numpy as np
-
-# from matplotlib.animation import FuncAnimation
-
-
-# def beta_pdf(x, a, b):
-#     return (x**(a-1) * (1-x)**(b-1) * math.gamma(a + b)
-#             / (math.gamma(a) * math.gamma(b)))
-
-
-# class UpdateDist:
-#     def __init__(self, ax, prob=0.5):
-#         self.success = 0
-#         self.prob = prob
-#         self.line, = ax.plot([], [], 'k-')
-#         self.x = np.linspace(0, 1, 200)
-#         self.ax = ax
-
-#         # Set up plot parameters
-#         self.ax.set_xlim(0, 1)
-#         self.ax.set_ylim(0, 10)
-#         self.ax.grid(True)
-
-#         # This vertical line represents the theoretical value, to
-#         # which the plotted distribution should converge.
-#         self.ax.axvline(prob, linestyle='--', color='black')
-
-#     def __call__(self, i):
-#         # This way the plot can continuously run and we just keep
-#         # watching new realizations of the process
-#         if i == 0:
-#             self.success = 0
-#             self.line.set_data([], [])
-#             return self.line,
-
-#         # Choose success based on exceed a threshold with a uniform pick
-#         if np.random.rand() < self.prob:
-#             self.success += 1
-#         y = beta_pdf(self.x, self.success + 1, (i - self.success) + 1)
-#         self.line.set_data(self.x, y)
-#         return self.line,
-
-# # Fixing random state for reproducibility
-# np.random.seed(19680801)
-
-
-# fig, ax = plt.subplots()
-# ud = UpdateDist(ax, prob=0.7)
-# anim = FuncAnimation(fig, ud, frames=100, interval=100, blit=True)
-# plt.show()
-
 import scipy
 import scipy.interpolate as si
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+import os
 
 from matplotlib.backend_bases import MouseButton
 
@@ -101,17 +49,6 @@ def bspline(cv, n=100, degree=3, periodic=False):
     return np.array(si.splev(u, (kv,cv.T,degree))).T
 
 
-fig, ax = plt.subplots()
-control_points = np.array([[0,0]])
-spline_points = np.array([[0,0]])
-
-control = ax.plot(control_points[:,0], control_points[:,1], 'x', color='black')
-spline = ax.plot([],[], label='spline', color='red')
-ax.axis('equal')
-ax.set_xlim(-10, 10)
-ax.set_ylim(-10, 10)
-
-
 
 def on_move(event):
     if event.inaxes:
@@ -141,9 +78,49 @@ def on_click(event):
 
     plt.show()
 
-binding_id = plt.connect('motion_notify_event', on_move)
-plt.connect('button_press_event', on_click)
-plt.connect('close_event', on_close)
-plt.grid()
-plt.legend()
-plt.show()
+
+def generate_batch_of_splines(out_path, B = 10, n_control_points = 100, n_pts_spline_segment = 100):
+    # B - batch size
+    # n_control_points - number of control verticies of B-spline
+    # n_pts_spline_segment - number of points for each spline segement
+
+    os.makedirs(out_path, exist_ok=True)
+    # TODO clean up directory for each run
+
+    for b in range(B):
+        rnd_pts = np.random.uniform(-5,5,size=(n_control_points,2))
+
+        spline_points = bspline(rnd_pts,n_control_points*n_pts_spline_segment,3)
+
+        plt.plot(spline_points[:,0],spline_points[:,1])
+
+        np.savetxt(f'./splines/spline_{b}.txt',spline_points)
+
+    plt.grid()
+    plt.title('Generated batch of trajectories')
+    plt.axis('equal')
+    plt.show()
+
+
+if __name__ == "__main__":
+    generate_trajectories_batch(4,10)
+
+
+
+
+    fig, ax = plt.subplots()
+    control_points = np.array([[0,0]])
+    spline_points = np.array([[0,0]])
+
+    control = ax.plot(control_points[:,0], control_points[:,1], 'x', color='black')
+    spline = ax.plot([],[], label='spline', color='red')
+    ax.axis('equal')
+    ax.set_xlim(-10, 10)
+    ax.set_ylim(-10, 10)
+
+    binding_id = plt.connect('motion_notify_event', on_move)
+    plt.connect('button_press_event', on_click)
+    plt.connect('close_event', on_close)
+    plt.grid()
+    plt.legend()
+    plt.show()

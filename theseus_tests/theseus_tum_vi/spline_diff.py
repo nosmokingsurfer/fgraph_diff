@@ -8,13 +8,16 @@ def generate_imu_data(data):
     
     """
 
-    sampling_rate = 100
-    dt = 1.0/sampling_rate
+    sampling_rate = 100 #TODO parametrise this place
+    dt = 1.0/sampling_rate 
 
     # plt.plot(data[:,0], data[:,1])
     # plt.plot(data[:,0], data[:,1],'x')
 
     velocity=np.diff(data,axis=0)/dt
+
+    # plt.figure()
+    # plt.plot(*velocity.T)
 
     vel_abs = np.linalg.norm(velocity,axis=1)
 
@@ -31,17 +34,6 @@ def generate_imu_data(data):
     # calculating norml unitary vector
     n = tau[:,::-1].copy()
     n[:,0] = -n[:,0]
-
-    # print(tau)
-    # print(n)
-
-    scalars = []
-
-    for i in range(len(tau)):
-        scalars.append(np.dot(n[i],tau[i]))
-
-    # plt.figure()
-    # plt.plot(scalars)
 
     # calculatig the accelerometer measurmenets
 
@@ -70,14 +62,14 @@ def generate_imu_data(data):
 
     # plt.show()
 
-    # TODO check differentiating reuslts
+    # TODO check differentiating results via integration
 
-    return acc_measurments, gyro_measurments
+    return acc_measurments[:-1], gyro_measurments[:-1].reshape(-1,1), tau, n, velocity
 
 if __name__ == "__main__":
     log_path = './theseus_tests/theseus_tum_vi/spline_points.txt'
     data = np.genfromtxt(log_path)
-    acc_measurments, gyro_measurments = generate_imu_data(data)
+    acc_measurments, gyro_measurments,_,_ = generate_imu_data(data)
 
     fig, ax = plt.subplots()
 
