@@ -15,10 +15,10 @@ class Spline_2D_Dataset(Dataset):
         self.window = window
 
         self.bias_acc = np.array([0,0])
-        self.Q_acc = np.array([0.01**2,0,0,0.01**2]).reshape(2,2)
+        self.Q_acc = np.array([0.05**2,0,0,0.05**2]).reshape(2,2)
 
         self.bias_w = np.array([0])
-        self.Q_w = np.array([0.01**2]).reshape(1,1)
+        self.Q_w = np.array([0.03**2]).reshape(1,1)
 
         paths = glob.glob(f'{spline_path}spline_*.txt')
         print(f"Found {len(paths)} splines in path: {spline_path}")

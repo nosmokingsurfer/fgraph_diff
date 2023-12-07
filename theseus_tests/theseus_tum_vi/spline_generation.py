@@ -90,6 +90,8 @@ def generate_batch_of_splines(out_path, B = 10, n_control_points = 100, n_pts_sp
     for b in range(B):
         rnd_pts = np.random.uniform(-5,5,size=(n_control_points,2))
 
+        rnd_pts[:,0] = np.linspace(0,20,n_control_points)
+
         spline_points = bspline(rnd_pts,n_control_points*n_pts_spline_segment,3)
 
         plt.plot(spline_points[:,0],spline_points[:,1])
