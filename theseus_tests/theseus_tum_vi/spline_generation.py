@@ -105,11 +105,7 @@ def generate_batch_of_splines(out_path, B = 10, n_control_points = 100, n_pts_sp
 
 
 if __name__ == "__main__":
-    generate_trajectories_batch(4,10)
-
-
-
-
+    
     fig, ax = plt.subplots()
     control_points = np.array([[0,0]])
     spline_points = np.array([[0,0]])
