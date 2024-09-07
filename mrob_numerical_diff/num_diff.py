@@ -53,8 +53,7 @@ def compose_graph(vertex_ini, factors, factors_dictionary, perturb_index=None, d
     return graph
 
 
-def numerical_diff(toro_file):
-    dz = 1e-5
+def numerical_diff(toro_file, dz):
     vertex_ini, factors, factors_dictionary = read_graph_toro_description(toro_file)
     
     graph_0 = compose_graph(vertex_ini, factors, factors_dictionary)
@@ -112,8 +111,8 @@ def visualize_gradient(gradient):
 
 input_file = './benchmarks/M3500.txt'
 n = 100
-output_file = f'./benchmarks/M{n}.txt'
-simplify_toro_file(input_file, output_file, n)
-read_graph_toro_description(input_file)
-gradient = numerical_diff(output_file)
+simplified_file = f'./benchmarks/M{n}.txt'
+simplify_toro_file(input_file, simplified_file, n)
+
+gradient = numerical_diff(simplified_file, dz=1e-5)
 visualize_gradient(gradient)
