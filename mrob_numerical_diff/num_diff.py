@@ -74,7 +74,7 @@ def numerical_diff(toro_file, dz):
 
         # Compose the graph with perturbation
         graph_new = compose_graph(vertex_ini, factors, factors_dictionary, perturb_index=perturb_index, dz=dz)
-        graph_new.solve()
+        graph_new.solve(mrob.LM)
         x_new = graph_new.get_estimated_state()
 
         dx_new = (np.array(x_new).flatten() - x_0) / dz
@@ -86,14 +86,23 @@ def numerical_diff(toro_file, dz):
 def simplify_toro_file(input_file, output_file, size):
 
     vertices = []
+    verticies_ids = []
     edges = []
     
     with open(input_file, 'r') as f:
         for line in f:
             if line.startswith('VERTEX2') and len(vertices) < size:
                 vertices.append(line)
-            elif line.startswith('EDGE2') and len(edges) < size - 1:
-                edges.append(line)
+                verticies_ids.append(line.split(' ')[1])
+        f.close()
+    with open(input_file, 'r') as f:
+        for line in f:
+            if line.startswith('EDGE2'):
+                src,dst = line.split(' ')[1:3]
+                if src in verticies_ids and dst in verticies_ids:
+                    edges.append(line)
+        f.close()
+
 
     with open(output_file, 'w') as f_out:
         f_out.writelines(vertices)
@@ -104,7 +113,12 @@ def simplify_toro_file(input_file, output_file, size):
 
 def visualize_gradient(gradient):
     plt.figure(figsize=(10, 8))
-    sns.heatmap(gradient, cmap='coolwarm', cbar=True)
+    plt.imshow(gradient)
+    plt.title('Gradients')
+    plt.show()
+
+    plt.figure(figsize=(10, 8))
+    plt.spy(gradient,precision=1e-5)
     plt.title('Gradients')
     plt.show()
 
