@@ -40,8 +40,8 @@ def compose_graph(vertex_ini, factors, factors_dictionary, perturb_index=None, d
             obs = factors[nodeOrigin, t][:3].copy()
 
             # Perturb one element from (dx, dy, dtheta) based on perturb_index
-            if perturb_index is not None and t == perturb_index[0]:
-                obs[perturb_index[1]] += dz 
+            if perturb_index is not None and (nodeOrigin, t) == perturb_index[:2]:
+                obs[perturb_index[2]] += dz 
 
             covInv = np.zeros((3, 3))
             covInv[0, 0] = factors[nodeOrigin, t][3]
