@@ -28,3 +28,32 @@ there are two options to get gradient - one via direct gradient of dx/dz the sec
         dx_new = (x_new - x_0)/dz
         gradient[:,i] = dx_new
     }
+
+
+
+d^2 chi2() / dzdx -> ?
+d^2 chi2() / dzdx  = chi2(x_0,z_0) - 2* + 
+
+graph.chi2() -> scalar
+
+
+def num_diff_2(graph):
+    graph.solve()
+
+    x_0 = graph.get_estiamted_state()
+
+    chi2_0 = graph.chi2()
+
+    for j in range(dim(x)):
+        for i in range(dim(z)):
+            graph_++ = compose_graph(x_0 + dx[j], z + dz[i])
+            graph_+- = ...
+            graph_-+ = ...
+            graph_-- = ...
+
+            chi2++ = graph_++.chi2(params=True)
+            chi2+- = graph_+-.chi2(...)
+
+
+            #https://en.wikipedia.org/wiki/Finite_difference#Multivariate_finite_differences
+            chi2[i,j] = (chi2++ - ...)/(4*dx*dz)
