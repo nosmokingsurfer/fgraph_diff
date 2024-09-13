@@ -64,13 +64,14 @@ def numerical_diff(toro_file, dz):
 
     obs_dim = len(factors) * 3  # 3 elements (dx, dy, dtheta) per factor
     gradient = np.zeros((len(x_0), obs_dim))
-
+    factor_keys = list(factors.keys())
+    
     for i in tqdm(range(obs_dim)):
         factor_idx = i // 3  
         coord_idx = i % 3   
         
-        # Perturb the ith observation coordinate
-        perturb_index = (factor_idx + 1, coord_idx) 
+        nodeOrigin, t = factor_keys[factor_idx]
+        perturb_index = (nodeOrigin, t, coord_idx) 
 
         # Compose the graph with perturbation
         graph_new = compose_graph(vertex_ini, factors, factors_dictionary, perturb_index=perturb_index, dz=dz)
