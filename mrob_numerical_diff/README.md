@@ -29,10 +29,10 @@ there are two options to get gradient - one via direct gradient of dx/dz the sec
         gradient[:,i] = dx_new
     }
 
-
-
 d^2 chi2() / dzdx -> ?
+
 d^2 chi2() / dzdx  = chi2(x_0,z_0) - 2* + 
+
 
 graph.chi2() -> scalar
 
