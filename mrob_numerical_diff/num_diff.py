@@ -84,7 +84,7 @@ def numerical_diff1(toro_file, dz=1e-4):
 
         dx_new = (np.array(x_new).flatten() - x_0) / dz
         gradient[:, i] = dx_new
-    visualize_gradient(gradient, 'gradient', dx=dx, dz=dz)
+    visualize_gradient(gradient, 'gradient', dx=None, dz=dz)
     return gradient
 
 
