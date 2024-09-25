@@ -19,7 +19,9 @@ def read_graph_toro_description(toro_file):
             if d[0] == 'EDGE2':
                 factors[int(d[1]), int(d[2])] = np.array([d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11]], dtype='float64')
                 factors_dictionary[int(d[2])].append(int(d[1]))
-                
+            elif d[0] == 'EDGE1':
+                factors[int(d[1]), int(d[1])] = np.array([d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10]], dtype='float64')
+                factors_dictionary[int(d[1])].append(int(d[1]))
             elif d[0] == 'VERTEX2':
                 vertex_ini[int(d[1])] = np.array([d[2], d[3], d[4]], dtype='float64')
                 factors_dictionary[int(d[1])] = []
@@ -35,17 +37,17 @@ def compose_graph(vertex_ini, factors, factors_dictionary, perturb_index_x=None,
         if perturb_index_x is not None and t == perturb_index_x[0]:
             x[perturb_index_x[1]] += dx
         if t == 0:
-           graph.add_node_pose_2d(x, mrob.NODE_ANCHOR)
+            n = graph.add_node_pose_2d(x, mrob.NODE_ANCHOR)
         else:   
-            graph.add_node_pose_2d(x)
+            n = graph.add_node_pose_2d(x)
+        assert t == n, 'index on node is different from counter'
 
-    for t in range(1, N):
-        connecting_nodes = factors_dictionary[t]
-        for nodeOrigin in connecting_nodes:
+        for nodeOrigin in factors_dictionary[n]:
             obs = factors[nodeOrigin, t][:3].copy()
 
             # Perturb one element from (dx, dy, dtheta) based on perturb_index (nodeOrigin, t, coord_idx) 
             if perturb_index_z is not None and (nodeOrigin, t) == perturb_index_z[:2]:
+                print(perturb_index_z)
                 obs[perturb_index_z[2]] += dz 
 
             covInv = np.zeros((3, 3))
@@ -53,7 +55,10 @@ def compose_graph(vertex_ini, factors, factors_dictionary, perturb_index_x=None,
             covInv[1, 1] = factors[nodeOrigin, t][5]
             covInv[2, 2] = factors[nodeOrigin, t][6]
 
-            graph.add_factor_2poses_2d(obs, nodeOrigin, t, covInv)
+            if nodeOrigin != n:
+                graph.add_factor_2poses_2d(obs, nodeOrigin, t, covInv)
+            elif nodeOrigin == n:
+                graph.add_factor_1pose_2d(obs, nodeOrigin, covInv)
 
     return graph
 
@@ -62,7 +67,7 @@ def numerical_diff1(toro_file, dz=1e-4):
     vertex_ini, factors, factors_dictionary = read_graph_toro_description(toro_file)
     
     graph_0 = compose_graph(vertex_ini, factors, factors_dictionary)
-    graph_0.solve()
+    graph_0.solve(mrob.LM, verbose=True)
     x_0 = graph_0.get_estimated_state()
 
     x_0 = np.array(x_0).flatten()
@@ -79,12 +84,11 @@ def numerical_diff1(toro_file, dz=1e-4):
 
         # Compose the graph with perturbation
         graph_new = compose_graph(vertex_ini, factors, factors_dictionary, perturb_index_z=perturb_index, dz=dz)
-        graph_new.solve(mrob.LM)
+        graph_new.solve(mrob.LM,verbose=False)
         x_new = graph_new.get_estimated_state()
 
         dx_new = (np.array(x_new).flatten() - x_0) / dz
         gradient[:, i] = dx_new
-    visualize_gradient(gradient, 'gradient', dx=None, dz=dz)
     return gradient
 
 
@@ -129,7 +133,6 @@ def numerical_diff2(toro_file, dx=1e-1, dz=1e-1):
             chi2_mm = graph_mm.chi2(evaluateResidualsFlag=True)
 
             chi2_matrix[i_x, i_z] = (chi2_pp - chi2_pm - chi2_mp + chi2_mm) / 4 / dx / dz
-    visualize_gradient(chi2_matrix, 'chi2', dx=dx, dz=dz)
     return chi2_matrix
 
 
@@ -161,21 +164,23 @@ def simplify_toro_file(input_file, output_file, size):
     print('Vertices:', len(vertices), 'Edges:', len(edges))
 
 
-def visualize_gradient(gradient, title, dx, dz):
+def visualize_gradient(gradient, title, dx = None, dz=None):
     fig, ax = plt.subplots(1, 2, figsize=(10, 5), sharex=True, sharey=True)
     ax[0].imshow(gradient)
-
-    ax[1].spy(gradient,precision=1e-5)
+    ax[1].spy(gradient)
     plt.suptitle(f'{title}\n {dx=}, {dz=}')
     plt.show()
 
+if __name__ == "__main__":
+    input_file = './benchmarks/M3500.txt'
+    n = 20
+    simplified_file = f'./benchmarks/M{n}.txt'
+    simplify_toro_file(input_file, simplified_file, n)
 
-input_file = './benchmarks/M3500.txt'
-n = 20
-simplified_file = f'./benchmarks/M{n}.txt'
-simplify_toro_file(input_file, simplified_file, n)
+    dx = 1e-1
+    dz = 1e-4
+    gradient = numerical_diff1(simplified_file, dz=dz)
+    visualize_gradient(gradient,'gradient #1',dx=None,dz=dz)
 
-dx = 1e-1
-dz = 1e-4
-gradient = numerical_diff1(simplified_file, dz=dz)
-chi2_matrix = numerical_diff2(simplified_file, dx=dx, dz=dz)
+    chi2_matrix = numerical_diff2(simplified_file, dx=dx, dz=dz)
+    visualize_gradient(chi2_matrix,'gradient #2', dx=dx, dz=dz)
