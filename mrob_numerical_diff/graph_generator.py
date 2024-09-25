@@ -26,7 +26,7 @@ class ToRoContainer():
         return self.toro_lines
         
 
-def generate_linear_random_graph(nodes: int = 5, gpsInfo = np.eye(3)*1e3, odoInfo = np.eye(3)*1e2) -> mrob.FGraphDiff:
+def generate_linear_random_graph(nodes: int = 5, gpsInfo = np.eye(3)*1e3, odoInfo = np.eye(3)*1e2):
 
     toro_container = ToRoContainer()
 
