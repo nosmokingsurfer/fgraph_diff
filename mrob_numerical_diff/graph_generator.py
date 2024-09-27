@@ -70,8 +70,8 @@ def print_grad(gradient):
 if __name__ == "__main__":
 
     # setting deltas for nuerical diffs
-    dx = 1e-1
-    dz = 1e-1
+    dx = 1e-5
+    dz = 1e-5
 
     # generating random graph with odometry and gps factors
     # TODO generate gere from spline dataset
