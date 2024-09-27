@@ -33,8 +33,10 @@ def compose_graph(vertex_ini, factors, factors_dictionary, perturb_index_x=None,
     N = len(vertex_ini)
 
     for t in range(N):
-        x = vertex_ini[t]
+        x = vertex_ini[t].copy()
+        #x = vertex_ini[t]
         if perturb_index_x is not None and t == perturb_index_x[0]:
+            #print(f"Perturbing x[{t}][{perturb_index_x[1]}] by {dx}")
             x[perturb_index_x[1]] += dx
         if t == 0:
             n = graph.add_node_pose_2d(x, mrob.NODE_ANCHOR)
@@ -47,7 +49,8 @@ def compose_graph(vertex_ini, factors, factors_dictionary, perturb_index_x=None,
 
             # Perturb one element from (dx, dy, dtheta) based on perturb_index (nodeOrigin, t, coord_idx) 
             if perturb_index_z is not None and (nodeOrigin, t) == perturb_index_z[:2]:
-                print(perturb_index_z)
+                #print(perturb_index_z)
+                #print(f"Perturbing z[{nodeOrigin, t}][{perturb_index_z[2]}] by {dz}")
                 obs[perturb_index_z[2]] += dz 
 
             covInv = np.zeros((3, 3))
@@ -173,12 +176,12 @@ def visualize_gradient(gradient, title, dx = None, dz=None):
 
 if __name__ == "__main__":
     input_file = './benchmarks/M3500.txt'
-    n = 20
+    n = 100
     simplified_file = f'./benchmarks/M{n}.txt'
     simplify_toro_file(input_file, simplified_file, n)
 
-    dx = 1e-1
-    dz = 1e-4
+    dx = 1e-5
+    dz = 1e-5
     gradient = numerical_diff1(simplified_file, dz=dz)
     visualize_gradient(gradient,'gradient #1',dx=None,dz=dz)
 

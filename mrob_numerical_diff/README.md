@@ -23,8 +23,8 @@ there are two options to get gradient - one via direct gradient of dx/dz the sec
     for i in len(obs_dim) # obs_dim = sum(dim(z_i))
     {
         graph_new = compose_graph_with perturbed ith observation coordinate()
-        x_new = graph_new.chi2(True)
-        help(chi2)
+        <!-- x_new = graph_new.chi2(True)
+        help(chi2) -->
         dx_new = (x_new - x_0)/dz
         gradient[:,i] = dx_new
     }
