@@ -4,7 +4,9 @@ np.set_printoptions(precision=2,linewidth=160)
 
 
 import matplotlib.pyplot as plt
-from num_diff import read_graph_toro_description, compose_graph, numerical_diff1, numerical_diff2, visualize_gradient
+plt.switch_backend('TkAgg')
+from num_diff import read_graph_toro_description, compose_graph, numerical_diff1, numerical_diff2, visualize_gradient, compare_gradients
+
 
 class ToRoContainer():
     def __init__(self):
@@ -77,7 +79,8 @@ if __name__ == "__main__":
     # TODO generate gere from spline dataset
     # TODO add get/set functions to API to address factors with certain ID to read and write their parameters. the same for nodes
     toro_file = 'toro_graph.txt'
-    graph, toro_lines = generate_linear_random_graph(3)
+    size = 30
+    graph, toro_lines = generate_linear_random_graph(size)
 
 
     print(toro_lines)
@@ -95,16 +98,13 @@ if __name__ == "__main__":
     np.allclose(np.array(graph.get_estimated_state()),np.array(graph_0.get_estimated_state()))
 
     # computing first gradient with (x - x_gt)/dz after solve
-    gradient1 = numerical_diff1(toro_file, dz=dz)
+    gradient1 = np.asarray(numerical_diff1(toro_file, dz=dz))
     
-    visualize_gradient(gradient1, 'gradient #1', dx=None, dz=dz)
+    #visualize_gradient(gradient1, 'gradient #1', dx=None, dz=dz)
 
     # computing gradient using chi2 squares and explicit theorem
-    gradient2 = numerical_diff2(toro_file,dx=dx,dz =dx)
+    gradient2 = np.asarray(numerical_diff2(toro_file,dx=dx,dz =dx))
 
-    visualize_gradient(gradient2, 'gradient #2', dx=dx, dz=dz)
-
-    # visualizing the diff between gradients
-    plt.imshow(gradient1 - gradient2)
-    plt.title('grad_1 - grad_2')
-    plt.show()
+    #visualize_gradient(gradient2, 'gradient #2', dx=dx, dz=dz)
+    
+    compare_gradients(gradient1, gradient2, dx=dx, dz=dz)

@@ -2,9 +2,9 @@ import numpy as np
 import mrob
 from tqdm import tqdm 
 import matplotlib.pyplot as plt
-import seaborn as sns
 import os
 from multiprocessing import Pool, cpu_count
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 def read_graph_toro_description(toro_file):
@@ -37,11 +37,11 @@ def compose_graph(vertex_ini, factors, factors_dictionary, perturb_index_x=None,
         x = vertex_ini[t].copy()
         #x = vertex_ini[t]
         if perturb_index_x is not None and t == perturb_index_x[0]:
-            #print(f"Perturbing x[{t}][{perturb_index_x[1]}] by {dx}")
+            # print(f"Perturbing x[{t}][{perturb_index_x[1]}] by {dx}")
             x[perturb_index_x[1]] += dx
         if t == 0:
             n = graph.add_node_pose_2d(x)
-        else:   
+        else:
             n = graph.add_node_pose_2d(x)
         assert t == n, 'index on node is different from counter'
 
@@ -71,9 +71,8 @@ def numerical_diff1(toro_file, dz=1e-4):
     vertex_ini, factors, factors_dictionary = read_graph_toro_description(toro_file)
     
     graph_0 = compose_graph(vertex_ini, factors, factors_dictionary)
-    graph_0.solve(mrob.LM, verbose=True)
+    graph_0.solve(mrob.LM, verbose=False)
     x_0 = graph_0.get_estimated_state()
-    print(graph_0.get_information_matrix().todense)
 
     x_0 = np.array(x_0).flatten()
 
@@ -130,35 +129,43 @@ def parallel_compute_chi2_matrix(args):
     vertex_ini, factors, factors_dictionary, factor_keys, i_x, i_z, dx, dz = args
     return compute_chi2_matrix(vertex_ini, factors, factors_dictionary, factor_keys, i_x, i_z, dx, dz)
 
+
 def numerical_diff2(toro_file, dx=1e-1, dz=1e-1):
     vertex_ini, factors, factors_dictionary = read_graph_toro_description(toro_file)
     graph_0 = compose_graph(vertex_ini, factors, factors_dictionary)
-    graph_0.chi2(evaluateResidualsFlag=True)
     x_0 = graph_0.get_estimated_state()
     x_0 = np.array(x_0).flatten()
     dim_x = len(x_0)
     dim_z = len(factors) * 3  
     chi2_matrix = np.zeros((dim_x, dim_z))
     factor_keys = list(factors.keys())
-    #hessian = graph_0.get_information_matrix().todense()
-    tasks = [(vertex_ini, factors, factors_dictionary, factor_keys, i_x, i_z, dx, dz)
-             for i_x in range(dim_x) for i_z in range(dim_z)]
-    
-    with Pool(cpu_count()) as pool:
-        results = [pool.apply_async(parallel_compute_chi2_matrix, args=(task,)) for task in tasks]
-
-        results = [res.get() for res in tqdm(results, total=len(tasks))]
-
-    for idx, (i_x, i_z) in enumerate([(i_x, i_z) for i_x in range(dim_x) for i_z in range(dim_z)]):
-        chi2_matrix[i_x, i_z] = results[idx]
-
-    return chi2_matrix #multiply by hessian 
+    graph_0.solve(mrob.LM, verbose=False)
+    hessian = graph_0.get_information_matrix().todense()
+    print(f'Information matrix: {hessian}')
+    condition_number = np.linalg.cond(hessian)
+    print(f"Hessian condition number: {condition_number}")
+    # x_new = graph_0.get_estimated_state()
+    # vertex_ini_new = {}
+    # for i in range(len(x_new)):
+    #     vertex_ini_new[i] = x_new[i].squeeze()
         
-    # for i_x in tqdm(range(dim_x)):
-    #     for i_z in range(dim_z):
-    #         chi2_matrix[i_x, i_z] = compute_chi2_matrix(vertex_ini, factors, factors_dictionary, factor_keys, i_x, i_z, dx, dz)
+    # tasks = [(vertex_ini, factors, factors_dictionary, factor_keys, i_x, i_z, dx, dz)
+    #          for i_x in range(dim_x) for i_z in range(dim_z)]
+    
+    # with Pool(cpu_count()) as pool:
+    #     results = [pool.apply_async(parallel_compute_chi2_matrix, args=(task,)) for task in tasks]
+    #     results = [res.get() for res in tqdm(results, total=len(tasks))]
+
+    # for idx, (i_x, i_z) in enumerate([(i_x, i_z) for i_x in range(dim_x) for i_z in range(dim_z)]):
+    #     chi2_matrix[i_x, i_z] = results[idx]
+
+    # return (-1) * hessian @ chi2_matrix #multiply by hessian 
+        
+    for i_x in tqdm(range(dim_x)):
+        for i_z in range(dim_z):
+            chi2_matrix[i_x, i_z] = compute_chi2_matrix(vertex_ini, factors, factors_dictionary, factor_keys, i_x, i_z, dx, dz)
             
-    # return chi2_matrix
+    return -np.linalg.inv(hessian) @ chi2_matrix 
 
 
 def simplify_toro_file(input_file, output_file, size):
@@ -195,9 +202,48 @@ def visualize_gradient(gradient, title, dx = None, dz=None):
     plt.suptitle(f'{title}\n {dx=}, {dz=}')
     plt.show()
 
+
+def normalize_matrix(matrix):
+    print(f'Norm of matrix: {np.linalg.norm(matrix)}')
+    return matrix / np.linalg.norm(matrix)
+
+
+def mean_squared_error(matrix1, matrix2):
+    return np.mean((matrix1 - matrix2) ** 2)
+
+
+def compare_gradients(gradient1, gradient2, dx=None, dz=None):
+    print('Norm of gradient1:', np.linalg.norm(gradient1))
+    print('Norm of gradient2:', np.linalg.norm(gradient2))
+    
+    vmin = min(gradient1.min(), gradient2.min())
+    vmax = max(gradient1.max(), gradient2.max())
+    
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5), sharex=True, sharey=True)
+    # gradient_both = np.hstack((gradient1_normalized, gradient2_normalized))
+    # plt.imshow(gradient_both)
+    # plt.title('Direct grad (left) vs chi2 grad (right)')
+    im1 = ax[0].imshow(gradient1, vmin=vmin, vmax=vmax, cmap='viridis')
+    ax[0].set_title('Gradient #1')
+    im2 = ax[1].imshow(gradient2, vmin=vmin, vmax=vmax, cmap='viridis')
+    ax[1].set_title('Gradient #2')
+    fig.colorbar(im1, ax=ax, orientation='vertical', fraction=0.02, pad=0.04)
+    plt.show()
+    
+    mse_value = mean_squared_error(gradient1, gradient2)
+    cos_sim = cosine_similarity(gradient1, gradient2)
+    
+    print(f'Cosine similarity: {(np.diag(cos_sim))}')
+    print(f'MSE value: {mse_value}')
+    
+    plt.imshow(gradient1 - gradient2)
+    plt.title('grad_1 - grad_2')
+    plt.show()
+    
+
 if __name__ == "__main__":
     input_file = './benchmarks/M3500.txt'
-    n = 10
+    n = 20
     simplified_file = f'./benchmarks/M{n}.txt'
     simplify_toro_file(input_file, simplified_file, n)
 
@@ -205,6 +251,7 @@ if __name__ == "__main__":
     dz = 1e-5
     
     gradient = numerical_diff1(simplified_file, dz=dz)
+    print(gradient.shape)
     visualize_gradient(gradient,'gradient #1',dx=None,dz=dz)
 
     # chi2_matrix = numerical_diff2(simplified_file, dx=dx, dz=dz)
