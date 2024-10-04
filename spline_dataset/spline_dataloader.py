@@ -2,8 +2,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from spline_diff import generate_imu_data
-from spline_generation import bspline
+from .spline_diff import generate_imu_data
 import glob
 from tqdm import tqdm
 import mrob
@@ -133,7 +132,7 @@ class Spline_2D_Dataset():
         
         result = {
             'imu': self.X[idx],
-            'y' : self.y[idx],
+            'gt_odometry' : self.y[idx],
             'gt_traj': self.gt_traj[idx],
             'gt_poses' : self.gt_poses[idx],
             'gt_velocity': self.gt_velocity[idx],

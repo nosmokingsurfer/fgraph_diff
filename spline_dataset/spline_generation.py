@@ -96,7 +96,7 @@ def generate_batch_of_splines(out_path, B = 10, n_control_points = 100, n_pts_sp
 
         plt.plot(spline_points[:,0],spline_points[:,1])
 
-        np.savetxt(f'./splines/spline_{b}.txt',spline_points)
+        np.savetxt(f'{out_path}/spline_{b}.txt',spline_points)
 
     plt.grid()
     plt.title('Generated batch of trajectories')
