@@ -4,7 +4,7 @@ np.set_printoptions(precision=2,linewidth=160)
 
 
 import matplotlib.pyplot as plt
-from num_diff import read_graph_toro_description, compose_graph, numerical_diff1, numerical_diff2,visualize_gradient
+from num_diff import read_graph_toro_description, compose_graph, numerical_diff1, numerical_diff2, visualize_gradient
 
 class ToRoContainer():
     def __init__(self):
@@ -70,8 +70,8 @@ def print_grad(gradient):
 if __name__ == "__main__":
 
     # setting deltas for nuerical diffs
-    dx = 0.1
-    dz = 0.1
+    dx = 1e-5
+    dz = 1e-5
 
     # generating random graph with odometry and gps factors
     # TODO generate gere from spline dataset
@@ -108,4 +108,3 @@ if __name__ == "__main__":
     plt.imshow(gradient1 - gradient2)
     plt.title('grad_1 - grad_2')
     plt.show()
-    

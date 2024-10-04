@@ -4,6 +4,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+from multiprocessing import Pool, cpu_count
 
 
 def read_graph_toro_description(toro_file):
@@ -33,11 +34,13 @@ def compose_graph(vertex_ini, factors, factors_dictionary, perturb_index_x=None,
     N = len(vertex_ini)
 
     for t in range(N):
-        x = vertex_ini[t]
+        x = vertex_ini[t].copy()
+        #x = vertex_ini[t]
         if perturb_index_x is not None and t == perturb_index_x[0]:
+            #print(f"Perturbing x[{t}][{perturb_index_x[1]}] by {dx}")
             x[perturb_index_x[1]] += dx
         if t == 0:
-            n = graph.add_node_pose_2d(x, mrob.NODE_ANCHOR)
+            n = graph.add_node_pose_2d(x)
         else:   
             n = graph.add_node_pose_2d(x)
         assert t == n, 'index on node is different from counter'
@@ -47,14 +50,15 @@ def compose_graph(vertex_ini, factors, factors_dictionary, perturb_index_x=None,
 
             # Perturb one element from (dx, dy, dtheta) based on perturb_index (nodeOrigin, t, coord_idx) 
             if perturb_index_z is not None and (nodeOrigin, t) == perturb_index_z[:2]:
-                print(perturb_index_z)
+                #print(perturb_index_z)
+                #print(f"Perturbing z[{nodeOrigin, t}][{perturb_index_z[2]}] by {dz}")
                 obs[perturb_index_z[2]] += dz 
 
             covInv = np.zeros((3, 3))
             covInv[0, 0] = factors[nodeOrigin, t][3]
             covInv[1, 1] = factors[nodeOrigin, t][5]
             covInv[2, 2] = factors[nodeOrigin, t][6]
-
+            #print(covInv)
             if nodeOrigin != n:
                 graph.add_factor_2poses_2d(obs, nodeOrigin, t, covInv)
             elif nodeOrigin == n:
@@ -69,6 +73,7 @@ def numerical_diff1(toro_file, dz=1e-4):
     graph_0 = compose_graph(vertex_ini, factors, factors_dictionary)
     graph_0.solve(mrob.LM, verbose=True)
     x_0 = graph_0.get_estimated_state()
+    print(graph_0.get_information_matrix().todense)
 
     x_0 = np.array(x_0).flatten()
 
@@ -96,44 +101,64 @@ def find_factor_coord_idx(index, coord_num=3):
     return index // coord_num, index % coord_num
 
 
-def numerical_diff2(toro_file, dx=1e-1, dz=1e-1):
+def compute_chi2_matrix(vertex_ini, factors, factors_dictionary, factor_keys, i_x, i_z, dx, dz):
+    #vertex_ini, factors, factors_dictionary, factor_keys, chi2_matrix, i_x, i_z, dx, dz = params
+    factor_idx_x, coord_idx_x = find_factor_coord_idx(i_x)
+    factor_idx_z, coord_idx_z = find_factor_coord_idx(i_z)
+    nodeOrigin_z, t_z = factor_keys[factor_idx_z]
+    perturb_index_x = (factor_idx_x, coord_idx_x)
+    perturb_index_z = (nodeOrigin_z, t_z, coord_idx_z)
     
-    vertex_ini, factors, factors_dictionary = read_graph_toro_description(toro_file)
-    
-    graph_0 = compose_graph(vertex_ini, factors, factors_dictionary)
-    graph_0.solve()
-    x_0 = graph_0.get_estimated_state()
+    graph_pp = compose_graph(vertex_ini, factors, factors_dictionary, 
+                                perturb_index_x=perturb_index_x, perturb_index_z = perturb_index_z, dx=dx, dz=dz) # x+h, z+k
+    graph_pm = compose_graph(vertex_ini, factors, factors_dictionary, 
+                                perturb_index_x=perturb_index_x, perturb_index_z = perturb_index_z, dx=dx, dz=-dz) # x+h, z-k
+    graph_mp = compose_graph(vertex_ini, factors, factors_dictionary, 
+                                perturb_index_x=perturb_index_x, perturb_index_z = perturb_index_z, dx=-dx, dz=dz) # x-h, z+k
+    graph_mm = compose_graph(vertex_ini, factors, factors_dictionary, 
+                                perturb_index_x=perturb_index_x, perturb_index_z = perturb_index_z, dx=-dx, dz=-dz) # x-h, z-k
 
+    chi2_pp = graph_pp.chi2(evaluateResidualsFlag=True)
+    chi2_pm = graph_pm.chi2(evaluateResidualsFlag=True)
+    chi2_mp = graph_mp.chi2(evaluateResidualsFlag=True)
+    chi2_mm = graph_mm.chi2(evaluateResidualsFlag=True)
+
+    return (chi2_pp - chi2_pm - chi2_mp + chi2_mm) / 4 / dx / dz
+
+
+def parallel_compute_chi2_matrix(args):
+    vertex_ini, factors, factors_dictionary, factor_keys, i_x, i_z, dx, dz = args
+    return compute_chi2_matrix(vertex_ini, factors, factors_dictionary, factor_keys, i_x, i_z, dx, dz)
+
+def numerical_diff2(toro_file, dx=1e-1, dz=1e-1):
+    vertex_ini, factors, factors_dictionary = read_graph_toro_description(toro_file)
+    graph_0 = compose_graph(vertex_ini, factors, factors_dictionary)
+    graph_0.chi2(evaluateResidualsFlag=True)
+    x_0 = graph_0.get_estimated_state()
     x_0 = np.array(x_0).flatten()
     dim_x = len(x_0)
     dim_z = len(factors) * 3  
     chi2_matrix = np.zeros((dim_x, dim_z))
     factor_keys = list(factors.keys())
+    #hessian = graph_0.get_information_matrix().todense()
+    tasks = [(vertex_ini, factors, factors_dictionary, factor_keys, i_x, i_z, dx, dz)
+             for i_x in range(dim_x) for i_z in range(dim_z)]
+    
+    with Pool(cpu_count()) as pool:
+        results = [pool.apply_async(parallel_compute_chi2_matrix, args=(task,)) for task in tasks]
 
-    for i_x in tqdm(range(dim_x)):
-        for i_z in range(dim_z):
-            factor_idx_x, coord_idx_x = find_factor_coord_idx(i_x)
-            factor_idx_z, coord_idx_z = find_factor_coord_idx(i_z)
-            nodeOrigin_z, t_z = factor_keys[factor_idx_z]
-            perturb_index_x = (factor_idx_x, coord_idx_x)
-            perturb_index_z = (nodeOrigin_z, t_z, coord_idx_z)
+        results = [res.get() for res in tqdm(results, total=len(tasks))]
+
+    for idx, (i_x, i_z) in enumerate([(i_x, i_z) for i_x in range(dim_x) for i_z in range(dim_z)]):
+        chi2_matrix[i_x, i_z] = results[idx]
+
+    return chi2_matrix #multiply by hessian 
+        
+    # for i_x in tqdm(range(dim_x)):
+    #     for i_z in range(dim_z):
+    #         chi2_matrix[i_x, i_z] = compute_chi2_matrix(vertex_ini, factors, factors_dictionary, factor_keys, i_x, i_z, dx, dz)
             
-            graph_pp = compose_graph(vertex_ini, factors, factors_dictionary, 
-                                     perturb_index_x=perturb_index_x, perturb_index_z = perturb_index_z, dx=dx, dz=dz) # x+h, z+k
-            graph_pm = compose_graph(vertex_ini, factors, factors_dictionary, 
-                                     perturb_index_x=perturb_index_x, perturb_index_z = perturb_index_z, dx=dx, dz=-dz) # x+h, z-k
-            graph_mp = compose_graph(vertex_ini, factors, factors_dictionary, 
-                                     perturb_index_x=perturb_index_x, perturb_index_z = perturb_index_z, dx=-dx, dz=dz) # x-h, z+k
-            graph_mm = compose_graph(vertex_ini, factors, factors_dictionary, 
-                                     perturb_index_x=perturb_index_x, perturb_index_z = perturb_index_z, dx=-dx, dz=-dz) # x-h, z-k
-
-            chi2_pp = graph_pp.chi2(evaluateResidualsFlag=True)
-            chi2_pm = graph_pm.chi2(evaluateResidualsFlag=True)
-            chi2_mp = graph_mp.chi2(evaluateResidualsFlag=True)
-            chi2_mm = graph_mm.chi2(evaluateResidualsFlag=True)
-
-            chi2_matrix[i_x, i_z] = (chi2_pp - chi2_pm - chi2_mp + chi2_mm) / 4 / dx / dz
-    return chi2_matrix
+    # return chi2_matrix
 
 
 def simplify_toro_file(input_file, output_file, size):
@@ -155,8 +180,7 @@ def simplify_toro_file(input_file, output_file, size):
                 if src in verticies_ids and dst in verticies_ids:
                     edges.append(line)
         f.close()
-
-
+        
     with open(output_file, 'w') as f_out:
         f_out.writelines(vertices)
         f_out.writelines(edges)
@@ -173,14 +197,15 @@ def visualize_gradient(gradient, title, dx = None, dz=None):
 
 if __name__ == "__main__":
     input_file = './benchmarks/M3500.txt'
-    n = 20
+    n = 10
     simplified_file = f'./benchmarks/M{n}.txt'
     simplify_toro_file(input_file, simplified_file, n)
 
-    dx = 1e-1
-    dz = 1e-4
+    dx = 1e-5
+    dz = 1e-5
+    
     gradient = numerical_diff1(simplified_file, dz=dz)
     visualize_gradient(gradient,'gradient #1',dx=None,dz=dz)
 
-    chi2_matrix = numerical_diff2(simplified_file, dx=dx, dz=dz)
-    visualize_gradient(chi2_matrix,'gradient #2', dx=dx, dz=dz)
+    # chi2_matrix = numerical_diff2(simplified_file, dx=dx, dz=dz)
+    # visualize_gradient(chi2_matrix,'gradient #2', dx=dx, dz=dz)
