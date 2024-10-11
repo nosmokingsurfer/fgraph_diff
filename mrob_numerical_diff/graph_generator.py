@@ -8,11 +8,44 @@ plt.switch_backend('TkAgg')
 from num_diff import read_graph_toro_description, compose_graph, numerical_diff1, numerical_diff2, visualize_gradient, compare_gradients
 
 
+def extract_upper_triangular_6x6(matrix):
+    elements = []
+    for i in range(6):
+        for j in range(i, 6):  # taking the elements where j >= i (upper triangle)
+            elements.append(matrix[i, j])
+    return elements
+
+
+def test_extract_upper_triangular_6x6():
+    info_matrix = np.array([[1, 5, 3, 1, 0, 0],
+                            [5, 2, 6, 2, 0, 0],
+                            [3, 6, 3, 7, 4, 0],
+                            [1, 2, 7, 4, 5, 1],
+                            [0, 0, 4, 5, 5, 6],
+                            [0, 0, 0, 1, 6, 6]])
+
+    expected_upper_triangular = [
+        1, 5, 3, 1, 0, 0,
+        2, 6, 2, 0, 0,
+        3, 7, 4, 0,
+        4, 5, 1,
+        5, 6,
+        6
+    ]
+
+    extracted_upper_triangular = extract_upper_triangular_6x6(info_matrix)
+
+    assert extracted_upper_triangular == expected_upper_triangular, \
+        f"Test failed! Expected {expected_upper_triangular} but got {extracted_upper_triangular}"
+
+    print("Test passed! The upper triangular extraction is correct.")
+
+
 class ToRoContainer():
     def __init__(self):
         self.toro_lines = ""
 
-    def add_node(self, n , x):
+    def add_node_pose_2d(self, n , x):
         # VERTEX2 408 -16.166323 -21.968629 -1.454484
         self.toro_lines +=f"VERTEX2 {n} {x[0]:.6f} {x[1]:.6f} {x[2]:.6f}\n"
 
@@ -26,7 +59,25 @@ class ToRoContainer():
 
     def get_lines(self):
         return self.toro_lines
-        
+    
+    def add_node_pose_3d(self, n, x): # x is Ln() representation of SE3 with shape = 6
+        self.toro_lines += f"VERTEX3 {n} {x[0]:.6f} {x[1]:.6f} {x[2]:.6f} {x[3]:.6f} {x[4]:.6f} {x[5]:.6f}\n"
+
+    # information matrix https://github.com/RainerKuemmerle/g2o/wiki/File-Format#user-content-Additional_Information         
+    def add_factor_1pose_3d(self, origin, meas, info):
+        self.toro_lines += f"EDGE1 {origin} {meas[0]:.6f} {meas[1]:.6f} {meas[2]:.6f} {meas[3]:.6f} {meas[4]:.6f} {meas[5]:.6f}"
+        upper_triangular = extract_upper_triangular_6x6(info)
+        for val in upper_triangular:
+            self.toro_lines += f" {val:.6f}"
+        self.toro_lines += "\n"        
+    
+    def add_factor_2poses_3d(self, origin, target, meas, info): # meas is Ln() representation of SE3 with shape = 6
+        self.toro_lines += f"EDGE3 {origin} {target} {meas[0]:.6f} {meas[1]:.6f} {meas[2]:.6f} {meas[3]:.6f} {meas[4]:.6f} {meas[5]:.6f}"
+    
+        upper_triangular = extract_upper_triangular_6x6(info)
+        for val in upper_triangular:
+            self.toro_lines += f" {val:.6f}"
+        self.toro_lines += "\n"
 
 def generate_linear_random_graph(nodes: int = 5, gpsInfo = np.eye(3)*1e3, odoInfo = np.eye(3)*1e2):
 
@@ -37,14 +88,14 @@ def generate_linear_random_graph(nodes: int = 5, gpsInfo = np.eye(3)*1e3, odoInf
 
     x = np.random.randn(3)*1e-1
     n = graph.add_node_pose_2d(x, mrob.NODE_ANCHOR)
-    toro_container.add_node(n,x)
+    toro_container.add_node_pose_2d(n,x)
 
 
     indexes = [n]
     for i in range(1, nodes):
         x = np.array([i,0,0]) + np.random.randn(3)*1e-1
         n = graph.add_node_pose_2d(x)
-        toro_container.add_node(n,x)
+        toro_container.add_node_pose_2d(n,x)
 
         odoObs = np.array([1,0,0]) + np.random.randn(3)*1e-1
 
@@ -70,7 +121,7 @@ def print_grad(gradient):
 
 
 if __name__ == "__main__":
-
+    test_extract_upper_triangular_6x6()
     # setting deltas for nuerical diffs
     dx = 1e-5
     dz = 1e-5

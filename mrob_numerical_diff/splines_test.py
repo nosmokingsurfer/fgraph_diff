@@ -9,10 +9,80 @@ import pickle
 
 from pathlib import Path
 
+import sys
+sys.path.insert(0,str(Path(".").resolve()))
+
 from spline_dataset.spline_generation import generate_batch_of_splines
 from spline_dataset.spline_dataloader import Spline_2D_Dataset
+from graph_generator import ToRoContainer
 
-from num_diff import read_graph_toro_description, compose_graph
+
+def info_matrix_from_triangular(elements):
+    full_matrix = np.zeros((6, 6))
+    upper_tri_indices = np.triu_indices(6)
+    full_matrix[upper_tri_indices] = elements
+    return full_matrix + np.triu(full_matrix, 1).T
+
+
+def read_graph_toro_description_3d(toro_file):
+    vertex_ini = {}
+    factors = {}
+    factors_dictionary = {}
+
+    with open(toro_file, 'r') as file:
+        for line in file:
+            d = line.strip().split()
+            if not d:
+                continue
+            if d[0] == 'VERTEX3':
+                node_index = int(d[1])
+                pose = np.array([float(v) for v in d[2:8]], dtype='float64')  # [x, y, z, roll, pitch, yaw] .Ln()
+                vertex_ini[node_index] = pose
+                factors_dictionary[node_index] = []
+            elif d[0] == 'EDGE3':
+                node_origin = int(d[1])
+                node_target = int(d[2])
+                meas = np.array([float(v) for v in d[3:9]], dtype='float64')  # [dx, dy, dz, droll, dpitch, dyaw] .Ln()
+                info_values = [float(v) for v in d[9:]]
+                info = info_matrix_from_triangular(info_values)
+                factors[(node_origin, node_target)] = (meas, info)
+                if node_target in factors_dictionary:
+                    factors_dictionary[node_target].append(node_origin)
+                else:
+                    factors_dictionary[node_target] = [node_origin]
+            elif d[0] == 'EDGE1':
+                node_index = int(d[1])
+                meas = np.array([float(v) for v in d[2:8]], dtype='float64')  # [x, y, z, roll, pitch, yaw]
+                info_values = [float(v) for v in d[8:]]
+                info = info_matrix_from_triangular(info_values)
+                factors[(node_index, node_index)] = (meas, info)
+                if node_index in factors_dictionary:
+                    factors_dictionary[node_index].append(node_index)
+                else:
+                    factors_dictionary[node_index] = [node_index]
+    return vertex_ini, factors, factors_dictionary
+
+
+def compose_graph_3d(vertex_ini, factors, factors_dictionary, perturb_index_x=None, perturb_index_z=None, dx=0, dz=0):
+    graph = mrob.FGraph()
+
+    for node_index in sorted(vertex_ini.keys()):
+        x = vertex_ini[node_index].copy()  # [x, y, z, roll, pitch, yaw]
+        # if perturb_index_x is not None and node_index == perturb_index_x[0]:
+        #     x[perturb_index_x[1]] += dx
+        pose = mrob.SE3(x)
+        graph.add_node_pose_3d(pose)
+
+    for (node_origin, node_target), (meas, info) in factors.items():
+        obs = meas.copy()
+        # if perturb_index_z is not None and (node_origin, node_target) == perturb_index_z[:2]:
+        #     obs[perturb_index_z[2]] += dz
+        obs_se3 = mrob.SE3(obs)
+        if node_origin != node_target:
+            graph.add_factor_2poses_3d(obs_se3, node_origin, node_target, info)
+        else:
+            graph.add_factor_1pose_3d(obs_se3, node_origin, info)
+    return graph
 
 
 def integrate(R,p,v,omega,acc,dt):
@@ -32,27 +102,28 @@ def populate_graph(sample, imu_step = 5, gps_step=10):
     W_gps = np.eye(6)
 
     graph = mrob.FGraph()
-    #TODO put toro container here
+    toro_container = ToRoContainer()
 
     nodes_ids = []
     
     # adding first node
-    T = sample['gt_se3'][0].T()
+    T = sample['gt_se3'][0]
     t = time_stamp=sample['time'][0]
-    n = graph.add_node_pose_3d(x=mrob.SE3(T))
+    n = graph.add_node_pose_3d(x=T)
+    toro_container.add_node_pose_3d(n, T.Ln())
     nodes_ids.append((n,0))
 
     # adding all other nodes
     for idx in range(imu_step, len(sample['imu']), imu_step):
-        T = sample['gt_se3'][idx].T()
+        T = sample['gt_se3'][idx]
         #injectiong noise
 
         # injecting (x,y) noise
-        # T[:2,3] = T[:2,3] + np.random.randn(2)*0.25
+        #T[:2,3] = T[:2,3] + np.random.randn(2)*0.25
 
         # putting update
         n = graph.add_node_pose_3d(x=mrob.SE3(T))
-        # TODO add 3d pose (vertex3) into toro container
+        toro_container.add_node_pose_3d(n, T.Ln()) #T,Ln only
         nodes_ids.append((n, idx))
 
     # reduced time matches to nodes timestamps
@@ -65,6 +136,7 @@ def populate_graph(sample, imu_step = 5, gps_step=10):
 
     # adding all odometry factors for created nodes
     odometry_factors = []
+    last_odo_factor_in_loop = False
     for i in range(0, len(nodes_ids) - 1):
 
         n, original_index = nodes_ids[i]
@@ -74,15 +146,25 @@ def populate_graph(sample, imu_step = 5, gps_step=10):
         acc_x, acc_y, omega_z = reduced_imu[i]
 
         # relative pose betweeb two vertexes
-        odo = (sample['gt_se3'][idx + 1].inv()*sample['gt_se3'][idx])
-
-        # TODO add 2pose 3d odometry factor to toro container
-        # graph.add_factor .... #TODO place something here
+        odo = (sample['gt_se3'][nodes_ids[i+1][1]].inv()*sample['gt_se3'][nodes_ids[i][1]]) #TODO recheck formula for odo
+        assert src == n == nodes_ids[i][0], 'Mismatch in source indexes'
+        assert dst == n + 1 == nodes_ids[i+1][0], 'Mismatch in destination indexes'
+        
+        graph.add_factor_2poses_3d(odo, src, dst, W_odo)
         odometry_factors.append((src,dst))
-    # TODO add to graph last odometry twist factor + put it into toro container
-
+        
+        toro_container.add_factor_2poses_3d(src, dst, odo.Ln(), W_odo) #only Ln array
+        last_odo_factor_in_loop = i + 1 == len(nodes_ids) - 1
+        
+    # add to graph last odometry twist factor if neede
+    if not last_odo_factor_in_loop:
+        odo = (sample['gt_se3'][nodes_ids[-1][1]] * sample['gt_se3'][nodes_ids[-2][1]].inv())
+        graph.add_factor_2poses_3d(odo, nodes_ids[-2][0], nodes_ids[-1][0], W_odo)
+        toro_container.add_factor_2poses_3d(nodes_ids[-2][0], nodes_ids[-1][0], odo.Ln(), W_odo)
+    
     # adding gps factors going along original IMU timestamps
     gps_factors = []
+    last_gps_factor_in_loop = False
     for idx in range(0, len(sample['imu']), gps_step):
         
         gps_timestamp = idx*0.01
@@ -90,22 +172,21 @@ def populate_graph(sample, imu_step = 5, gps_step=10):
         n_arg = np.argwhere(gps_timestamp >= reduced_time)
         if len(n_arg) > 0:
             n_arg = n_arg[-1][0]
-
-            # TODO add GPS factor to graph
-            # graph.add_factor_1pose_3d(obs=T, nodeId=n_arg, obsInvCov=W_gps)
-            # TODO add GPS factor for 3D pose to toro container
+            T = sample['gt_se3'][nodes_ids[n_arg][1]]
+            graph.add_factor_1pose_3d(T, nodes_ids[n_arg][0], W_gps)
+            toro_container.add_factor_1pose_3d(nodes_ids[n_arg][0], T.Ln(), W_gps)
+            
             gps_factors.append(n_arg)
+            last_gps_factor_in_loop = n_arg == len(nodes_ids) - 1 
     
-    #adding last pose as GPS factor
+    #adding last pose as GPS factor if needed
+    if not last_gps_factor_in_loop:
+        T = sample['gt_se3'][nodes_ids[-1][1]]
+        graph.add_factor_1pose_3d(T, nodes_ids[-1][0], W_gps)
+        gps_factors.append(nodes_ids[-1][0])
+        toro_container.add_factor_1pose_3d(nodes_ids[-1][0], T.Ln(), W_gps)
 
-    T = sample['gt_se3'][nodes_ids[-1][1]]
-    t = sample['time'][nodes_ids[-1][1]]
-
-    # TODO add GPS factor for 3D pose to toro container
-    # graph.add_factor_1pose_3d(obs=T, nodeId=nodes_ids[-1][0], obsInvCov=W_gps)
-    gps_factors.append(nodes_ids[-1][0])
-
-    return graph , "" #TODO output toro lines here as additional output
+    return graph, toro_container.get_lines()
 
 if __name__ == "__main__":
     start_time = time()
@@ -128,24 +209,24 @@ if __name__ == "__main__":
 
     # iterating through all splines in dataset
     for idx, sample in tqdm(enumerate(dataset)):
-        print(sample)
+        #print(sample)
         toro_file = output_path+f'spline_toro_graph_{idx}.txt'
 
         # initializing graph 
         graph, toro_lines = populate_graph(sample, imu_step=100, gps_step=100)
-        print(toro_lines)
+        #print(toro_lines)
 
         with open(toro_file,'w') as f:
             f.writelines(toro_lines)
             f.close()
 
         # reading serialised graph from toro file and composing it back into mrob FGraph
-        vertex_ini, factors, factors_dictionary = read_graph_toro_description(toro_file)
+        vertex_ini, factors, factors_dictionary = read_graph_toro_description_3d(toro_file)
         
-        graph_0 = compose_graph(vertex_ini, factors, factors_dictionary)
-
+        graph_0 = compose_graph_3d(vertex_ini, factors, factors_dictionary)
+        
         # checking that serialized and deserialized graphs have the same states
-        np.allclose(np.array(graph.get_estimated_state()),np.array(graph_0.get_estimated_state()))
+        np.allclose(np.array(graph.get_estimated_state()), np.array(graph_0.get_estimated_state()))
 
         initial_error = graph.chi2(True)
 
