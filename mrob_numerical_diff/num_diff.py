@@ -65,7 +65,7 @@ def compose_graph(vertex_ini, factors, factors_dictionary, perturb_index_x=None,
                 graph.add_factor_1pose_2d(obs, nodeOrigin, covInv)
 
     return graph
-
+    
 
 def numerical_diff1(toro_file, dz=1e-4):
     vertex_ini, factors, factors_dictionary = read_graph_toro_description(toro_file)
@@ -92,6 +92,9 @@ def numerical_diff1(toro_file, dz=1e-4):
         x_new = graph_new.get_estimated_state()
 
         dx_new = (np.array(x_new).flatten() - x_0) / dz
+        # T_new  = mrob.SE3(get_state()[index])
+        # T_old
+        # dx = (T_new * T_old.inv()).Ln() 
         gradient[:, i] = dx_new
     return gradient
 
@@ -243,7 +246,7 @@ def compare_gradients(gradient1, gradient2, dx=None, dz=None):
 
 if __name__ == "__main__":
     input_file = './benchmarks/M3500.txt'
-    n = 20
+    n = 100
     simplified_file = f'./benchmarks/M{n}.txt'
     simplify_toro_file(input_file, simplified_file, n)
 

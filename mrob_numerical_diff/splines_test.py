@@ -15,55 +15,11 @@ sys.path.insert(0,str(Path(".").resolve()))
 from spline_dataset.spline_generation import generate_batch_of_splines
 from spline_dataset.spline_dataloader import Spline_2D_Dataset
 from graph_generator import ToRoContainer
+from num_diff import mean_squared_error
+from num_diff_3d import read_graph_toro_description_3d, compose_graph_3d
 
 
-def info_matrix_from_triangular(elements):
-    full_matrix = np.zeros((6, 6))
-    upper_tri_indices = np.triu_indices(6)
-    full_matrix[upper_tri_indices] = elements
-    return full_matrix + np.triu(full_matrix, 1).T
-
-
-def read_graph_toro_description_3d(toro_file):
-    vertex_ini = {}
-    factors = {}
-    factors_dictionary = {}
-
-    with open(toro_file, 'r') as file:
-        for line in file:
-            d = line.strip().split()
-            if not d:
-                continue
-            if d[0] == 'VERTEX3':
-                node_index = int(d[1])
-                pose = np.array([float(v) for v in d[2:8]], dtype='float64')  # [x, y, z, roll, pitch, yaw] .Ln()
-                vertex_ini[node_index] = pose
-                factors_dictionary[node_index] = []
-            elif d[0] == 'EDGE3':
-                node_origin = int(d[1])
-                node_target = int(d[2])
-                meas = np.array([float(v) for v in d[3:9]], dtype='float64')  # [dx, dy, dz, droll, dpitch, dyaw] .Ln()
-                info_values = [float(v) for v in d[9:]]
-                info = info_matrix_from_triangular(info_values)
-                factors[(node_origin, node_target)] = (meas, info)
-                if node_target in factors_dictionary:
-                    factors_dictionary[node_target].append(node_origin)
-                else:
-                    factors_dictionary[node_target] = [node_origin]
-            elif d[0] == 'EDGE1':
-                node_index = int(d[1])
-                meas = np.array([float(v) for v in d[2:8]], dtype='float64')  # [x, y, z, roll, pitch, yaw]
-                info_values = [float(v) for v in d[8:]]
-                info = info_matrix_from_triangular(info_values)
-                factors[(node_index, node_index)] = (meas, info)
-                if node_index in factors_dictionary:
-                    factors_dictionary[node_index].append(node_index)
-                else:
-                    factors_dictionary[node_index] = [node_index]
-    return vertex_ini, factors, factors_dictionary
-
-
-def compose_graph_3d(vertex_ini, factors, factors_dictionary, perturb_index_x=None, perturb_index_z=None, dx=0, dz=0):
+def compose_graph_3d_no_perturb(vertex_ini, factors, factors_dictionary, perturb_index_x=None, perturb_index_z=None, dx=0, dz=0):
     graph = mrob.FGraph()
 
     for node_index in sorted(vertex_ini.keys()):
@@ -146,7 +102,7 @@ def populate_graph(sample, imu_step = 5, gps_step=10):
         acc_x, acc_y, omega_z = reduced_imu[i]
 
         # relative pose betweeb two vertexes
-        odo = (sample['gt_se3'][nodes_ids[i+1][1]].inv()*sample['gt_se3'][nodes_ids[i][1]]) #TODO recheck formula for odo
+        odo = (sample['gt_se3'][nodes_ids[i+1][1]].inv()*sample['gt_se3'][nodes_ids[i][1]]) #TODO https://github.com/prime-slam/mrob/blob/fix/numpy2.0_compat/src/FGraph/mrob/factors/factor2Poses3d.hpp
         assert src == n == nodes_ids[i][0], 'Mismatch in source indexes'
         assert dst == n + 1 == nodes_ids[i+1][0], 'Mismatch in destination indexes'
         
@@ -227,7 +183,9 @@ if __name__ == "__main__":
         
         # checking that serialized and deserialized graphs have the same states
         np.allclose(np.array(graph.get_estimated_state()), np.array(graph_0.get_estimated_state()))
+        print('MSE:', mean_squared_error(np.array(graph.get_estimated_state()), np.array(graph_0.get_estimated_state())))
 
         initial_error = graph.chi2(True)
+        print(initial_error)
 
     print(f"Elapsed time: {time() - start_time} secs")

@@ -79,10 +79,10 @@ class ToRoContainer():
             self.toro_lines += f" {val:.6f}"
         self.toro_lines += "\n"
 
+
 def generate_linear_random_graph(nodes: int = 5, gpsInfo = np.eye(3)*1e3, odoInfo = np.eye(3)*1e2):
 
     toro_container = ToRoContainer()
-
     # assert factors >= nodes*2
     graph = mrob.FGraph()
 
@@ -122,7 +122,7 @@ def print_grad(gradient):
 
 if __name__ == "__main__":
     test_extract_upper_triangular_6x6()
-    # setting deltas for nuerical diffs
+
     dx = 1e-5
     dz = 1e-5
 
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     # TODO generate gere from spline dataset
     # TODO add get/set functions to API to address factors with certain ID to read and write their parameters. the same for nodes
     toro_file = 'toro_graph.txt'
-    size = 30
+    size = 10
     graph, toro_lines = generate_linear_random_graph(size)
 
 
