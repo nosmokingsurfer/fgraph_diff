@@ -58,7 +58,6 @@ def read_graph_toro_description_3d(toro_file):
 
 def compose_graph_3d(vertex_ini, factors, factors_dictionary, perturb_index_x=None, perturb_index_z=None, dx=0, dz=0):
     graph = mrob.FGraph()
-    node_index_map = {}
     
     # adding nodes to the graph
     for idx, node_index in enumerate(sorted(vertex_ini.keys())):
@@ -67,13 +66,12 @@ def compose_graph_3d(vertex_ini, factors, factors_dictionary, perturb_index_x=No
             x[perturb_index_x[1]] += dx
         pose = mrob.SE3(x)
         n = graph.add_node_pose_3d(pose)
-        node_index_map[node_index] = n  # Map TORO index to mrob index
 
     # adding factors to the graph using mapped indices
     for node_target in factors_dictionary:
-        mrob_node_target = node_index_map[node_target]
+        mrob_node_target = node_target
         for node_origin in factors_dictionary[node_target]:
-            mrob_node_origin = node_index_map[node_origin]
+            mrob_node_origin = node_origin
             measurement, information_matrix = factors[(node_origin, node_target)]
             obs = measurement.copy()
             if perturb_index_z is not None and (node_origin, node_target) == perturb_index_z[:2]:
@@ -117,7 +115,7 @@ def numerical_diff1_3d(toro_file, dz=1e-4):
 
 
 if __name__ == "__main__":
-    toro_file = './out/spline_toro_graph_1.txt'
-    dz = 1e-3
+    toro_file = './out/spline_toro_graph_9.txt'
+    dz = 1e-4
     gradient1 = numerical_diff1_3d(toro_file, dz=dz)
     visualize_gradient(gradient1, 'Gradient via direct method for 3D spline dataset', dx = None, dz=dz)
