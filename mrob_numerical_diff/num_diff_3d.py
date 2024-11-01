@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import os
 from multiprocessing import Pool, cpu_count
 from sklearn.metrics.pairwise import cosine_similarity
-from num_diff import find_factor_coord_idx, visualize_gradient
+from num_diff import find_factor_coord_idx, visualize_gradient, compare_gradients
 import sys
 from pathlib import Path
 
@@ -114,8 +114,57 @@ def numerical_diff1_3d(toro_file, dz=1e-4):
     return gradient
 
 
-if __name__ == "__main__":
+def compute_chi2_matrix_3d(vertex_ini, factors, factors_dictionary, factor_keys, i_x, i_z, dx, dz):
+    factor_idx_x, coord_idx_x = find_factor_coord_idx(i_x, coord_num=6)
+    factor_idx_z, coord_idx_z = find_factor_coord_idx(i_z, coord_num=6)
+    nodeOrigin_z, t_z = factor_keys[factor_idx_z]
+    perturb_index_x = (factor_idx_x, coord_idx_x)
+    perturb_index_z = (nodeOrigin_z, t_z, coord_idx_z)
+    
+    graph_pp = compose_graph_3d(vertex_ini, factors, factors_dictionary, 
+                                perturb_index_x=perturb_index_x, perturb_index_z = perturb_index_z, dx=dx, dz=dz) # x+h, z+k
+    graph_pm = compose_graph_3d(vertex_ini, factors, factors_dictionary, 
+                                perturb_index_x=perturb_index_x, perturb_index_z = perturb_index_z, dx=dx, dz=-dz) # x+h, z-k
+    graph_mp = compose_graph_3d(vertex_ini, factors, factors_dictionary, 
+                                perturb_index_x=perturb_index_x, perturb_index_z = perturb_index_z, dx=-dx, dz=dz) # x-h, z+k
+    graph_mm = compose_graph_3d(vertex_ini, factors, factors_dictionary, 
+                                perturb_index_x=perturb_index_x, perturb_index_z = perturb_index_z, dx=-dx, dz=-dz) # x-h, z-k
+
+    chi2_pp = graph_pp.chi2(evaluateResidualsFlag=True)
+    chi2_pm = graph_pm.chi2(evaluateResidualsFlag=True)
+    chi2_mp = graph_mp.chi2(evaluateResidualsFlag=True)
+    chi2_mm = graph_mm.chi2(evaluateResidualsFlag=True)
+
+    return (chi2_pp - chi2_pm - chi2_mp + chi2_mm) / 4 / dx / dz
+
+
+def numerical_diff2_3d(toro_file, dx=1e-4, dz=1e-4):
+    vertex_ini, factors, factors_dictionary = read_graph_toro_description_3d(toro_file)
+    graph_0 = compose_graph_3d(vertex_ini, factors, factors_dictionary)
+    x_0 = graph_0.get_estimated_state()
+    dim_x = len(x_0) * 6
+    dim_z = len(factors) * 6
+    chi2_matrix = np.zeros((dim_x, dim_z))
+    factor_keys = list(factors.keys())
+    graph_0.solve(mrob.LM, verbose=False)
+    hessian = graph_0.get_information_matrix().todense()
+    
+    for i_x in tqdm(range(dim_x)):
+        for i_z in range(dim_z):
+            chi2_matrix[i_x, i_z] = compute_chi2_matrix_3d(vertex_ini, factors, factors_dictionary, factor_keys, i_x, i_z, dx, dz)
+            
+    return -np.linalg.inv(hessian) @ chi2_matrix
+
+
+if __name__ == "__main__":  
     toro_file = './out/spline_toro_graph_9.txt'
-    dz = 1e-4
+    dx = 1e-1
+    dz = 1e-1
+    
     gradient1 = numerical_diff1_3d(toro_file, dz=dz)
     visualize_gradient(gradient1, 'Gradient via direct method for 3D spline dataset', dx = None, dz=dz)
+    
+    gradient2 = numerical_diff2_3d(toro_file, dx=dx, dz=dz)
+    visualize_gradient(gradient2, 'Gradient via direct method for 3D spline dataset', dx = dx, dz=dz)
+    
+    compare_gradients(gradient1, gradient2, dx=dx, dz=dz)
