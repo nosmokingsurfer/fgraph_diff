@@ -198,12 +198,17 @@ def simplify_toro_file(input_file, output_file, size):
     print('Vertices:', len(vertices), 'Edges:', len(edges))
 
 
-def visualize_gradient(gradient, title, dx = None, dz=None):
+def visualize_gradient(gradient, title, dir_to_save, dx = None, dz=None):
     fig, ax = plt.subplots(1, 2, figsize=(10, 5), sharex=True, sharey=True)
     ax[0].imshow(gradient)
-    ax[1].spy(gradient)
-    plt.suptitle(f'{title}\n {dx=}, {dz=}')
-    plt.show()
+    ax[1].spy(gradient, precision=1e-7)
+    if dx == None:
+        plt.suptitle(f'{title}\n {dz=}')
+        plt.savefig(os.path.join(dir_to_save, f'gradient1_dz={dz}.png'))
+    else:
+        plt.suptitle(f'{title}\n {dx=}, {dz=}')
+        plt.savefig(os.path.join(dir_to_save, f'gradient2_dx={dx}_dz={dz}.png'))
+    
 
 
 def normalize_matrix(matrix):
@@ -212,10 +217,10 @@ def normalize_matrix(matrix):
 
 
 def mean_squared_error(matrix1, matrix2):
-    return np.mean((matrix1 - matrix2) ** 2)
+    return np.linalg.norm(matrix1 - matrix2)
 
 
-def compare_gradients(gradient1, gradient2, dx=None, dz=None):
+def compare_gradients(gradient1, gradient2, dir_to_save, dx=None, dz=None):
     print('Norm of gradient1:', np.linalg.norm(gradient1))
     print('Norm of gradient2:', np.linalg.norm(gradient2))
     
@@ -227,21 +232,22 @@ def compare_gradients(gradient1, gradient2, dx=None, dz=None):
     # plt.imshow(gradient_both)
     # plt.title('Direct grad (left) vs chi2 grad (right)')
     im1 = ax[0].imshow(gradient1, vmin=vmin, vmax=vmax, cmap='viridis')
-    ax[0].set_title('Gradient #1')
+    ax[0].set_title(f'Gradient #1, {dx=}')
     im2 = ax[1].imshow(gradient2, vmin=vmin, vmax=vmax, cmap='viridis')
-    ax[1].set_title('Gradient #2')
+    ax[1].set_title(f'Gradient #2, {dx=}, {dz=}')
     fig.colorbar(im1, ax=ax, orientation='vertical', fraction=0.02, pad=0.04)
-    plt.show()
+    plt.savefig(os.path.join(dir_to_save, f'both_dx={dx}_dz={dz}.png'))
+    # plt.show()
     
     mse_value = mean_squared_error(gradient1, gradient2)
-    cos_sim = cosine_similarity(gradient1, gradient2)
+    #cos_sim = cosine_similarity(gradient1, gradient2)
     
-    print(f'Cosine similarity: {(np.diag(cos_sim))}')
-    print(f'MSE value: {mse_value}')
+    # print(f'Cosine similarity: {(np.diag(cos_sim))}')
+    # print(f'MSE value: {mse_value}')
     
-    plt.imshow(gradient1 - gradient2)
-    plt.title('grad_1 - grad_2')
-    plt.show()
+    # plt.imshow(gradient1 - gradient2)
+    # plt.title('grad_1 - grad_2')
+    # plt.savefig(os.path.join(dir_to_save, 'difference.png'))
     
 
 if __name__ == "__main__":

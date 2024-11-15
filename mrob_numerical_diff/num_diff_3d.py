@@ -61,7 +61,7 @@ def compose_graph_3d(vertex_ini, factors, factors_dictionary, perturb_index_x=No
     
     # adding nodes to the graph
     for idx, node_index in enumerate(sorted(vertex_ini.keys())):
-        x = vertex_ini[node_index].copy()  # x is Ln() coordinates, shape=6: [x, y, z, roll, pitch, yaw]
+        x = vertex_ini[node_index].copy()  # x is Ln() coordinates, shape=6: [roll, pitch, yaw, x, y, z]
         if perturb_index_x is not None and node_index == perturb_index_x[0]:
             x[perturb_index_x[1]] += dx
         pose = mrob.SE3(x)
@@ -161,10 +161,21 @@ if __name__ == "__main__":
     dx = 1e-1
     dz = 1e-1
     
-    gradient1 = numerical_diff1_3d(toro_file, dz=dz)
-    visualize_gradient(gradient1, 'Gradient via direct method for 3D spline dataset', dx = None, dz=dz)
+    w_odo = 0.001
+    dir_to_save = f'./out/gradients_w_odo={w_odo}'
+    if not os.path.exists(dir_to_save):
+        os.makedirs(dir_to_save)
     
-    gradient2 = numerical_diff2_3d(toro_file, dx=dx, dz=dz)
-    visualize_gradient(gradient2, 'Gradient via direct method for 3D spline dataset', dx = dx, dz=dz)
+    perturbations_x = [0.1, 0.01, 0.001, 0.0001, 0.00001]
+    perturbations_z = [0.1, 0.01, 0.001, 0.0001, 0.00001]
     
-    compare_gradients(gradient1, gradient2, dx=dx, dz=dz)
+    for dx in perturbations_x:
+        for dz in perturbations_z:
+            gradient1 = numerical_diff1_3d(toro_file, dz=dz)
+            visualize_gradient(gradient1, 'Gradient via direct method for 3D spline dataset', dir_to_save, dx = None, dz=dz)
+            
+            gradient2 = numerical_diff2_3d(toro_file, dx=dx, dz=dz)
+            
+            visualize_gradient(gradient2, 'Gradient via chi2 for 3D spline dataset', dir_to_save, dx = dx, dz=dz)
+            
+            compare_gradients(gradient1, gradient2, dir_to_save, dx=dx, dz=dz) 

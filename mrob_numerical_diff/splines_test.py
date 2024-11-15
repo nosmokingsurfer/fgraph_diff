@@ -54,7 +54,7 @@ def integrate(R,p,v,omega,acc,dt):
 
 def populate_graph(sample, imu_step = 5, gps_step=10):
 
-    W_odo = np.eye(6)*1e-2
+    W_odo = np.eye(6)*0.001
     W_gps = np.eye(6)
 
     graph = mrob.FGraph()

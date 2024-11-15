@@ -130,7 +130,7 @@ if __name__ == "__main__":
     # TODO generate gere from spline dataset
     # TODO add get/set functions to API to address factors with certain ID to read and write their parameters. the same for nodes
     toro_file = 'toro_graph.txt'
-    size = 10
+    size = 30
     graph, toro_lines = generate_linear_random_graph(size)
 
 
